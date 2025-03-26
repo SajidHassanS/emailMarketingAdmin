@@ -10,6 +10,6 @@ const router = express.Router();
 router
     .route("/")
     .get(verifyToken, profileCtrl.getProfile)
-// .patch(verifyToken, setProfileImgPath, upload.single("profileImg"), profileCtrl.updateProfile);
+    .patch(verifyToken, setProfileImgPath, upload.single("profileImg"), profileCtrl.updateProfile);
 
 export default router;

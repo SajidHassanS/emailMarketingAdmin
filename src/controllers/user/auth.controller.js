@@ -23,8 +23,11 @@ import {
 } from "../../utils/responses.js";
 import { jwtSecret } from "../../config/initialConfig.js";
 import jwt from 'jsonwebtoken';
-import BlacklistToken from "../../models/admin/blackListToken.model.js";
-import Admin from "../../models/admin/admin.model.js";
+// import BlacklistToken from "../../models/admin/blackListToken.model.js";
+// import Admin from "../../models/admin/admin.model.js";
+
+import models from "../../models/models.js";
+const { Admin, BlacklistToken } = models
 
 // ========================= Register Admin ============================
 

@@ -30,6 +30,9 @@ export const validatePassword = (password, confirmPassword) => {
   if (password.length < 8) {
     return "Password must be at least 8 characters long";
   }
+
+  password = password.trim(); // Trim whitespace
+
   // Strong password criteria
   const strongPasswordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   if (!strongPasswordRegex.test(password)) {

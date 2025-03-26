@@ -1,9 +1,13 @@
-import BlacklistToken from "./admin/blackListToken.model.js";
+import User from "./user/user.model.js";
 import Admin from "./admin/admin.model.js";
+import Password from "./password/password.model.js";
+import BlacklistToken from "./admin/blackListToken.model.js";
 
 const models = {
+  User,
   Admin,
-  BlacklistToken
+  Password,
+  BlacklistToken,
 };
 
 export default models;

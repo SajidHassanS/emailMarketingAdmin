@@ -9,7 +9,6 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
-import os from "os";
 import { fileURLToPath } from "url";
 import path from "path";
 import { domain } from "./config/initialConfig.js";
@@ -25,7 +24,7 @@ import "./models/models.js";
 import authRoutes from "./routes/admin/auth.route.js";
 import profileRoutes from "./routes/admin/profile.route.js";
 import supplierRoutes from "./routes/supplier/supplier.route.js";
-// import applicationRoutes from "./routes/application/application.route.js";
+import passwordRoutes from "./routes/password/password.route.js";
 
 // =========================================
 //            Configurations
@@ -91,7 +90,7 @@ app.get("/", (req, res) => {
 app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/profile", profileRoutes);
 app.use("/api/supplier", supplierRoutes);
-// app.use("/api/applications", applicationRoutes);
+app.use("/api/password", passwordRoutes);
 
 // =========================================
 //            Global Error Handler
