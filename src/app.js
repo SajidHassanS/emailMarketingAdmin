@@ -25,6 +25,7 @@ import authRoutes from "./routes/admin/auth.route.js";
 import profileRoutes from "./routes/admin/profile.route.js";
 import supplierRoutes from "./routes/supplier/supplier.route.js";
 import passwordRoutes from "./routes/password/password.route.js";
+import emailRoutes from "./routes/email/email.route.js";
 
 // =========================================
 //            Configurations
@@ -91,6 +92,7 @@ app.use("/api/admin/auth", authRoutes);
 app.use("/api/admin/profile", profileRoutes);
 app.use("/api/supplier", supplierRoutes);
 app.use("/api/password", passwordRoutes);
+app.use("/api/email", emailRoutes);
 
 // =========================================
 //            Global Error Handler

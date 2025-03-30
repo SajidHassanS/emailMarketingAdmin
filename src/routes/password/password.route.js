@@ -8,13 +8,11 @@ const router = express.Router();
 
 // Profile routes
 router
-    .route("/")
-    // .get(verifyToken, passwordCtrl.getProfile)
-    .post(verifyToken, passwordCtrl.addPassword)
-    .patch(verifyToken, passwordCtrl.updatePasswords);
+  .route("/")
+  .get(verifyToken, passwordCtrl.getPassword)
+  .post(verifyToken, passwordCtrl.addPassword)
+  .patch(verifyToken, passwordCtrl.updatePasswords);
 
-router
-    .route("/bulk-add")
-    .post(verifyToken, passwordCtrl.addBulkPasswords)
+router.route("/bulk-add").post(verifyToken, passwordCtrl.addBulkPasswords);
 
 export default router;

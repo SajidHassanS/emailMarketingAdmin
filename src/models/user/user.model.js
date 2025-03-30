@@ -52,8 +52,13 @@ const User = sequelize.define(
     },
     passwordUuid: {
       type: DataTypes.UUID,
-      references: { model: 'Password', key: 'uuid' },
-      allowNull: true // Initially null if no passwords exist
+      references: { model: "Password", key: "uuid" },
+      allowNull: true, // Initially null if no passwords exist
+    },
+    userTitle: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
     },
   },
   {
@@ -64,7 +69,6 @@ const User = sequelize.define(
 );
 
 export default User;
-
 
 // ========================= Relations ============================
 
