@@ -40,6 +40,15 @@ const Email = sequelize.define(
       allowNull: false,
       references: { model: "User", key: "uuid" },
     },
+    amount: {
+      type: DataTypes.INTEGER,
+      allowNull: true, // Optional on creation, added when approved
+      defaultValue: 0,
+    },
+    isWithdrawn: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   },
   {
     underscored: true,

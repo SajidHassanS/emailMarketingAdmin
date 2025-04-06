@@ -26,6 +26,8 @@ import profileRoutes from "./routes/admin/profile.route.js";
 import supplierRoutes from "./routes/supplier/supplier.route.js";
 import passwordRoutes from "./routes/password/password.route.js";
 import emailRoutes from "./routes/email/email.route.js";
+import systemSettingRoutes from "./routes/systemSetting/systemSetting.route.js";
+import withdrawalRoutes from "./routes/withdrawal/withdrawal.route.js";
 
 // =========================================
 //            Configurations
@@ -93,6 +95,8 @@ app.use("/api/admin/profile", profileRoutes);
 app.use("/api/supplier", supplierRoutes);
 app.use("/api/password", passwordRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/system-setting", systemSettingRoutes);
+app.use("/api/withdrawal", withdrawalRoutes);
 
 // =========================================
 //            Global Error Handler
