@@ -1,12 +1,12 @@
 import models from "../../models/models.js";
-const { Email, Withdrawal } = models;
+const { Email, Withdrawal, WithdrawalMethod } = models;
 // Request a withdrawal
 export async function requestWithdrawal(req, res) {
   try {
-    const { method, phoneNumber } = req.body;
     const userUuid = req.userUid;
+    const { method } = req.body; // Optional: methodType to override default
 
-    // Check if the user has a default method set
+    // Fetch user's default withdrawal method
     const defaultMethod = await WithdrawalMethod.findOne({
       where: { userUuid, isDefault: true },
     });
@@ -18,27 +18,37 @@ export async function requestWithdrawal(req, res) {
       );
     }
 
-    // If the method is not default, use the provided method
-    const methodToUse = method || defaultMethod.methodType;
-    const phoneToUse = phoneNumber || defaultMethod.accountNumber;
+    let methodToUse = defaultMethod;
 
-    // Check if the user has any approved emails for withdrawal
+    // If user provided a methodType, use it instead
+    if (method) {
+      const providedMethod = await WithdrawalMethod.findOne({
+        where: { userUuid, methodType: method },
+      });
+
+      if (!providedMethod) {
+        return frontError(res, "Specified withdrawal method not found.");
+      }
+
+      methodToUse = providedMethod;
+    }
+
+    // Get all eligible emails for withdrawal
     const availableEmails = await Email.findAll({
       where: { userUuid, status: "good", isWithdrawn: false },
     });
 
-    const totalAmount = availableEmails.reduce((sum, e) => sum + e.amount, 0);
+    const totalAmount = availableEmails.reduce((sum, email) => sum + email.amount, 0);
 
     if (totalAmount === 0) {
       return frontError(res, "No withdrawable amount found.");
     }
 
-    // Create a withdrawal record
+    // Create the withdrawal record using withdrawalMethodUuid
     const withdrawal = await Withdrawal.create({
       userUuid,
+      withdrawalMethodUuid: methodToUse.uuid,
       amount: totalAmount,
-      method: methodToUse,
-      phoneNumber: phoneToUse,
     });
 
     // Mark emails as withdrawn
@@ -53,7 +63,8 @@ export async function requestWithdrawal(req, res) {
       withdrawal
     );
   } catch (error) {
-    console.log("Error requesting withdrawal:", error);
+    console.error("Error requesting withdrawal:", error);
     return frontError(res, "Failed to request withdrawal.");
   }
 }
+
