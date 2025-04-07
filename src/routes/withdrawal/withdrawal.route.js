@@ -4,8 +4,14 @@ import verifyToken from "../../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Email routes
-router.route("/request").get(verifyToken, withdrawalCtrl.requestWithdrawal); // Get all email
+// Withdrawal routes
+router.route("/all").get(verifyToken, withdrawalCtrl.getAllWithdrawals); // Get all withdrawal requests
+
+router.route("/approve").patch(verifyToken, withdrawalCtrl.approveWithdrawal); // approve pending withdrawal request
+
+router.route("/reject").patch(verifyToken, withdrawalCtrl.rejectWithdrawal); // reject pending withdrawal request
+
+router.route("/stats").get(verifyToken, withdrawalCtrl.getwithdrawalStats); // get withdrawal stats
 
 // router
 //   .route("/")

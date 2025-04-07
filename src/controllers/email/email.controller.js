@@ -11,32 +11,33 @@ const { User, Email, Notification } = models;
 import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
 import DuplicateEmail from "../../models/email/duplicateEmail.model.js";
 import SystemSetting from "../../models/systemSetting/systemSetting.model.js";
+import { createNotification } from "../../utils/notificationUtils.js";
 
 // ========================= Helping Function ============================
 
-export async function createNotification({
-  userUuid,
-  message,
-  title = null,
-  type = "info",
-  metadata = null,
-}) {
-  try {
-    // Create the notification in the database
-    const notification = await Notification.create({
-      userUuid,
-      message,
-      title,
-      type,
-      metadata,
-    });
+// export async function createNotification({
+//   userUuid,
+//   message,
+//   title = null,
+//   type = "info",
+//   metadata = null,
+// }) {
+//   try {
+//     // Create the notification in the database
+//     const notification = await Notification.create({
+//       userUuid,
+//       message,
+//       title,
+//       type,
+//       metadata,
+//     });
 
-    return notification;
-  } catch (error) {
-    console.error("Error creating notification:", error);
-    throw new Error("Failed to create notification");
-  }
-}
+//     return notification;
+//   } catch (error) {
+//     console.error("Error creating notification:", error);
+//     throw new Error("Failed to create notification");
+//   }
+// }
 
 // ========================= Get All Emails ============================
 

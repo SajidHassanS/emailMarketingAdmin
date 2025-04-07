@@ -9,7 +9,13 @@ router
   .route("/email-reward")
   .get(verifyToken, systemSettingCtrl.getDefaultEmailReward)
   .post(verifyToken, systemSettingCtrl.setDefaultEmailReward)
-  .patch(verifyToken, systemSettingCtrl.setDefaultEmailReward); // Get all email
+  .patch(verifyToken, systemSettingCtrl.setDefaultEmailReward);
+
+router
+  .route("/withdrawal-threshold")
+  .get(verifyToken, systemSettingCtrl.getReferralWithdrawalThreshold)
+  .post(verifyToken, systemSettingCtrl.setReferralWithdrawalThreshold)
+  .patch(verifyToken, systemSettingCtrl.setReferralWithdrawalThreshold);
 
 // router
 //   .route("/")

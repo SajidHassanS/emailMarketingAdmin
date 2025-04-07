@@ -1,70 +1,238 @@
+import { Op, Sequelize } from "sequelize";
+import Email from "../../models/email/email.model.js";
 import models from "../../models/models.js";
-const { Email, Withdrawal, WithdrawalMethod } = models;
-// Request a withdrawal
-export async function requestWithdrawal(req, res) {
+import { queryReqFields } from "../../utils/requiredFields.js";
+import { catchError, frontError, notFound, successOkWithData } from "../../utils/responses.js";
+import { createNotification } from "../../utils/notificationUtils.js";
+const { User, Withdrawal, WithdrawalMethod } = models;
+
+// All pending withdrawal requests
+export async function getAllWithdrawals(req, res) {
   try {
-    const userUuid = req.userUid;
-    const { method } = req.body; // Optional: methodType to override default
+    const { status, startDate, endDate, search } = req.query;
 
-    // Fetch user's default withdrawal method
-    const defaultMethod = await WithdrawalMethod.findOne({
-      where: { userUuid, isDefault: true },
-    });
+    const whereConditions = {};
+    const userConditions = {};
 
-    if (!defaultMethod) {
-      return frontError(
-        res,
-        "No default withdrawal method found. Please add one."
-      );
+    // 1. Status filter
+    if (status && ["pending", "approved", "rejected"].includes(status)) {
+      whereConditions.status = status;
     }
 
-    let methodToUse = defaultMethod;
-
-    // If user provided a methodType, use it instead
-    if (method) {
-      const providedMethod = await WithdrawalMethod.findOne({
-        where: { userUuid, methodType: method },
-      });
-
-      if (!providedMethod) {
-        return frontError(res, "Specified withdrawal method not found.");
+    // 2. Date range filter
+    if (startDate || endDate) {
+      whereConditions.createdAt = {};
+      if (startDate) {
+        // Convert startDate to Date and reset time to midnight (start of day)
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);  // Reset time to 00:00:00
+        whereConditions.createdAt[Op.gte] = start;
       }
 
-      methodToUse = providedMethod;
+      if (endDate) {
+        // Convert endDate to Date and reset time to 23:59:59
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);  // Set time to 23:59:59
+        whereConditions.createdAt[Op.lte] = end;
+      }
     }
 
-    // Get all eligible emails for withdrawal
-    const availableEmails = await Email.findAll({
-      where: { userUuid, status: "good", isWithdrawn: false },
-    });
-
-    const totalAmount = availableEmails.reduce((sum, email) => sum + email.amount, 0);
-
-    if (totalAmount === 0) {
-      return frontError(res, "No withdrawable amount found.");
+    // 3. User search filter
+    if (search) {
+      userConditions[Op.or] = [
+        { username: { [Op.iLike]: `%${search}%` } },
+        { phone: { [Op.iLike]: `%${search}%` } },
+      ];
     }
 
-    // Create the withdrawal record using withdrawalMethodUuid
-    const withdrawal = await Withdrawal.create({
-      userUuid,
-      withdrawalMethodUuid: methodToUse.uuid,
-      amount: totalAmount,
+    const withdrawals = await Withdrawal.findAll({
+      where: whereConditions,
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["username", "countryCode", "phone", "userTitle"],
+          where: Object.keys(userConditions).length ? userConditions : undefined,
+        },
+        {
+          model: WithdrawalMethod,
+          as: "withdrawalMethod",
+        },
+      ],
+      order: [["createdAt", "DESC"]],
     });
 
-    // Mark emails as withdrawn
-    await Email.update(
-      { isWithdrawn: true },
-      { where: { userUuid, status: "good", isWithdrawn: false } }
-    );
+    if (!withdrawals.length)
+      return notFound(res, "No withdrawals found.");
 
-    return successOk(
-      res,
-      `Withdrawal of ₨${totalAmount} requested successfully.`,
-      withdrawal
-    );
+    return successOkWithData(res, "Withdrawals fetched successfully.", withdrawals);
   } catch (error) {
-    console.error("Error requesting withdrawal:", error);
-    return frontError(res, "Failed to request withdrawal.");
+    console.error("Error fetching all withdrawals:", error);
+    return catchError(res, error);
   }
 }
 
+
+
+export async function approveWithdrawal(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const { uuid } = req.query;
+
+    const withdrawal = await Withdrawal.findOne({ where: { uuid } });
+
+    if (!withdrawal) {
+      return frontError(res, "Withdrawal request not found.");
+    }
+
+    if (withdrawal.status !== "pending") {
+      return frontError(res, "Only pending requests can be approved.");
+    }
+
+    withdrawal.status = "approved";
+    await withdrawal.save();
+
+    // ✅ Create a success notification for the user
+    await createNotification({
+      userUuid: withdrawal.userUuid,
+      title: "Withdrawal Approved",
+      message: `Your withdrawal request of ₨ ${withdrawal.amount} has been approved.`,
+      type: "success",
+      metadata: {
+        withdrawalUuid: withdrawal.uuid,
+        amount: withdrawal.amount,
+      },
+    });
+
+    return successOkWithData(res, "Withdrawal approved successfully.", withdrawal);
+  } catch (error) {
+    console.error("Error approving withdrawal:", error);
+    return catchError(res, error)
+  }
+}
+
+export async function rejectWithdrawal(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const { uuid } = req.query;
+
+    const withdrawal = await Withdrawal.findOne({ where: { uuid } });
+
+    if (!withdrawal) {
+      return frontError(res, "Withdrawal request not found.");
+    }
+
+    if (withdrawal.status !== "pending") {
+      return frontError(res, "Only pending requests can be rejected.");
+    }
+
+    withdrawal.status = "rejected";
+    await withdrawal.save();
+
+    // Rollback associated emails
+    await Email.update(
+      { isWithdrawn: false },
+      {
+        where: {
+          userUuid: withdrawal.userUuid,
+          isWithdrawn: true,
+          status: "good",
+        },
+      }
+    );
+
+    // ✅ Create a success notification for the user
+    await createNotification({
+      userUuid: withdrawal.userUuid,
+      title: "Withdrawal Rejected",
+      message: `Your withdrawal request of ₨ ${withdrawal.amount} has been rejected.`,
+      type: "error",
+      metadata: {
+        withdrawalUuid: withdrawal.uuid,
+        amount: withdrawal.amount,
+      },
+    });
+
+    return successOkWithData(res, "Withdrawal rejected successfully.", withdrawal);
+  } catch (error) {
+    console.error("Error rejecting withdrawal:", error);
+    return frontError(res, "Failed to reject withdrawal.");
+  }
+}
+
+export async function getwithdrawalStats(req, res) {
+  try {
+    // Get today's and this month's date range
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfToday = new Date(today.setHours(0, 0, 0, 0)); // Start of today at midnight
+
+    // Get total withdrawn today
+    const totalWithdrawnToday = await Withdrawal.sum("amount", {
+      where: {
+        status: "approved", // Only consider approved withdrawals
+        createdAt: {
+          [Op.gte]: startOfToday, // From the start of today
+        },
+      },
+    });
+
+    // Get total withdrawn this month
+    const totalWithdrawnThisMonth = await Withdrawal.sum("amount", {
+      where: {
+        status: "approved", // Only consider approved withdrawals
+        createdAt: {
+          [Op.gte]: startOfMonth, // From the start of this month
+        },
+      },
+    });
+
+    // Get the number of pending withdrawals
+    const pendingWithdrawalsCount = await Withdrawal.count({
+      where: { status: "pending" },
+    });
+
+    // Get total amount withdrawn (all-time) for approved and rejected withdrawals
+    const totalAmountWithdrawn = await Withdrawal.sum("amount", {
+      where: {
+        status: "approved" // Only consider approved withdrawals
+      },
+    });
+
+    // Get top users by amount withdrawn for approved withdrawals only
+    const topUsers = await Withdrawal.findAll({
+      attributes: [
+        "userUuid",
+        [Sequelize.fn("SUM", Sequelize.col("amount")), "totalAmount"],
+      ],
+      group: ["userUuid", "user.uuid", "user.username", "user.phone"], // Added User's fields to GROUP BY
+      order: [[Sequelize.fn("SUM", Sequelize.col("amount")), "DESC"]],
+      limit: 5, // Top 5 users
+      where: {
+        status: "approved", // Only consider approved withdrawals for top users
+      },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["uuid", "username", "phone"], // Ensure user fields are selected
+        },
+      ],
+    });
+
+    return successOkWithData(res, "Dashboard stats fetched successfully.", {
+      totalWithdrawnToday,
+      totalWithdrawnThisMonth,
+      pendingWithdrawalsCount,
+      totalAmountWithdrawn,
+      topUsers,
+    });
+  } catch (error) {
+    console.error("Error fetching admin dashboard stats:", error);
+    return catchError(res, error);
+  }
+}

@@ -54,3 +54,50 @@ export async function setDefaultEmailReward(req, res) {
     return catchError(res, error);
   }
 }
+
+export async function getReferralWithdrawalThreshold(req, res) {
+  try {
+    const setting = await SystemSetting.findOne({
+      where: { key: "referral_withdrawal_threshold" },
+    });
+
+    const threshold = setting ? parseInt(setting.value) : 100; // fallback to 100 if not found
+    return successOkWithData(
+      res,
+      "Referral withdrawal threshold fetched successfully.",
+      { referralWithdrawalThreshold: threshold }
+    );
+  } catch (error) {
+    console.log("Error fetching referral withdrawal threshold: ", error);
+    return catchError(res, error);
+  }
+}
+
+export async function setReferralWithdrawalThreshold(req, res) {
+  try {
+    const reqBodyFields = bodyReqFields(req, res, ["threshold"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { threshold } = req.body;
+
+    if (isNaN(threshold) || threshold <= 0) {
+      return frontError(res, "Threshold must be a valid positive number.");
+    }
+
+    // Create or update the threshold value
+    const [setting, created] = await SystemSetting.findOrCreate({
+      where: { key: "referral_withdrawal_threshold" },
+      defaults: { value: threshold.toString() },
+    });
+
+    if (!created) {
+      setting.value = threshold.toString();
+      await setting.save();
+    }
+
+    return successOk(res, `Referral withdrawal threshold set to ${threshold}`);
+  } catch (error) {
+    console.log("Error setting referral withdrawal threshold: ", error);
+    return catchError(res, error);
+  }
+}
