@@ -13,6 +13,10 @@ router.route("/reject").patch(verifyToken, withdrawalCtrl.rejectWithdrawal); // 
 
 router.route("/stats").get(verifyToken, withdrawalCtrl.getwithdrawalStats); // get withdrawal stats
 
+// router.route("/bonus/all").get(verifyToken, withdrawalCtrl.getAllWithdrawals); // Get all bonus withdrawal requests
+
+router.route("/bonus").patch(verifyToken, withdrawalCtrl.approveRejectBonusWithdrawal); // approve/reject pending bonus withdrawal request
+
 // router
 //   .route("/")
 //   .get(verifyToken, withdrawalCtrl.getAllEmails) // Temporary Get all email

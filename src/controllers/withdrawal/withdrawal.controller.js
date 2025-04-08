@@ -1,9 +1,11 @@
 import { Op, Sequelize } from "sequelize";
 import Email from "../../models/email/email.model.js";
 import models from "../../models/models.js";
-import { queryReqFields } from "../../utils/requiredFields.js";
-import { catchError, frontError, notFound, successOkWithData } from "../../utils/responses.js";
+import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
+import { catchError, frontError, notFound, successOkWithData, validationError } from "../../utils/responses.js";
 import { createNotification } from "../../utils/notificationUtils.js";
+import Bonus from "../../models/bonus/bonus.model.js";
+import BonusWithdrawal from "../../models/bonus/bonusWithdrawal.model.js";
 const { User, Withdrawal, WithdrawalMethod } = models;
 
 // All pending withdrawal requests
@@ -105,6 +107,57 @@ export async function approveWithdrawal(req, res) {
         amount: withdrawal.amount,
       },
     });
+
+    // 1. Check if this is the user's first approved withdrawal
+    const withdrawalCount = await Withdrawal.count({
+      where: { userUuid: withdrawal.userUuid, status: "approved" },
+    });
+
+    // 2. If it's the first approved withdrawal, unlock the user's signup bonus
+    if (withdrawalCount === 1) {
+      // 2.1 Unlock the user's signup bonus
+      const bonus = await Bonus.findOne({
+        where: { userUuid: withdrawal.userUuid, type: "signup" }, // Added type to query
+      });
+
+      if (bonus) {
+        // 2.2 Update the user's signup bonus status to unlocked
+        await bonus.update({ unlockedAfterFirstWithdrawal: true });
+
+        // Optionally, notify the user about the bonus unlocking
+        await createNotification({
+          userUuid: withdrawal.userUuid,
+          title: "Signup Bonus Unlocked",
+          message: "Your signup bonus has been unlocked after your first withdrawal.",
+          type: "success",
+        });
+      }
+
+      // 2.3 Check if the user was referred by someone (i.e., if there is a referrer)
+      if (bonus && bonus.refereeUuid) {
+        // 2.4 If the user was referred, unlock the referrer's referral bonus
+        const referrerBonus = await Bonus.findOne({
+          where: {
+            userUuid: bonus.refereeUuid,  // Referrer (user whose referral code was used)
+            type: "referral",              // Only looking for referral bonus
+          },
+        });
+
+        if (referrerBonus) {
+          // 2.5 Update the referrer's referral bonus to unlocked
+          await referrerBonus.update({ unlockedAfterFirstWithdrawal: true });
+
+          // Optionally, notify the referrer about the bonus unlocking
+          await createNotification({
+            userUuid: bonus.refereeUuid,
+            title: "Referral Bonus Unlocked",
+            message: "Your referral bonus has been unlocked after your referee's first withdrawal.",
+            type: "success",
+          });
+        }
+      }
+    }
+
 
     return successOkWithData(res, "Withdrawal approved successfully.", withdrawal);
   } catch (error) {
@@ -234,5 +287,80 @@ export async function getwithdrawalStats(req, res) {
   } catch (error) {
     console.error("Error fetching admin dashboard stats:", error);
     return catchError(res, error);
+  }
+}
+
+
+// Admin API to approve or reject bonus withdrawal requests
+export async function approveRejectBonusWithdrawal(req, res) {
+  const reqBodyFields = bodyReqFields(req, res, ["withdrawalUuid", "action"]);
+  if (reqBodyFields.error) return reqBodyFields.response;
+
+  const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
+
+  // Validate action type
+  if (!['approve', 'reject'].includes(action)) {
+    return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
+  }
+
+  try {
+    // ✅ Fetch the withdrawal request by UUID
+    const withdrawalRequest = await BonusWithdrawal.findOne({
+      where: {
+        uuid: withdrawalUuid,
+      },
+    });
+
+    if (!withdrawalRequest) {
+      return validationError(res, "No withdrawal request found with the provided UUID.");
+    }
+
+    // ✅ Fetch the associated bonus for this withdrawal request
+    const bonus = await Bonus.findOne({
+      where: {
+        uuid: withdrawalRequest.bonusUuid,
+      },
+    });
+
+    if (!bonus) {
+      return validationError(res, "The associated bonus for this withdrawal request is not found.");
+    }
+
+    // ✅ If the action is to approve, update the withdrawal request status
+    if (action === 'approve') {
+      withdrawalRequest.status = 'approved';
+      await withdrawalRequest.save();
+
+      // ✅ Notify the user about the successful approval
+      await createNotification({
+        userUuid: bonus.userUuid,
+        title: "Bonus Withdrawal Approved",
+        message: `Your ${bonus.type} bonus withdrawal request has been approved.`,
+        type: "success",
+      });
+
+      return successOkWithData(res, "Bonus withdrawal request approved successfully.");
+    }
+
+    // ✅ If the action is to reject, update the withdrawal request status to rejected
+    if (action === 'reject') {
+      withdrawalRequest.status = 'rejected';
+
+      // ✅ Save the rejected status to the database
+      await withdrawalRequest.save();
+
+      // ✅ Notify the user about the rejection
+      await createNotification({
+        userUuid: bonus.userUuid,
+        title: "Bonus Withdrawal Rejected",
+        message: `Your ${bonus.type} bonus withdrawal request has been rejected.`,
+        type: "error",
+      });
+
+      return successOkWithData(res, "Bonus withdrawal request rejected successfully.");
+    }
+  } catch (error) {
+    console.error("Error processing bonus withdrawal approval/rejection:", error);
+    return frontError(res, "Something went wrong. Please try again later.");
   }
 }
