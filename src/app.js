@@ -13,6 +13,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { domain } from "./config/initialConfig.js";
 // import passport from "./config/passport.js";
+import http from 'http';  // This imports the http module
 
 // =========================================
 //             Code Import
@@ -20,6 +21,7 @@ import { domain } from "./config/initialConfig.js";
 import { nodeEnv, port } from "./config/initialConfig.js";
 import { connectDB } from "./config/dbConfig.js";
 import { getIPAddress } from "./utils/utils.js";
+import { setupSocketIO } from "./socketConfig.js";
 import "./models/models.js";
 import authRoutes from "./routes/admin/auth.route.js";
 import profileRoutes from "./routes/admin/profile.route.js";
@@ -28,6 +30,7 @@ import passwordRoutes from "./routes/password/password.route.js";
 import emailRoutes from "./routes/email/email.route.js";
 import systemSettingRoutes from "./routes/systemSetting/systemSetting.route.js";
 import withdrawalRoutes from "./routes/withdrawal/withdrawal.route.js";
+import messageRoutes from "./routes/message/message.route.js";
 
 // =========================================
 //            Configurations
@@ -41,9 +44,6 @@ import session from "express-session";
 app.use(
   session({ secret: "yoursecret", resave: false, saveUninitialized: false })
 );
-// app.use(passport.session());
-
-// ... your routes and rest of the code
 
 app.use(cookieParser());
 
@@ -97,6 +97,7 @@ app.use("/api/password", passwordRoutes);
 app.use("/api/email", emailRoutes);
 app.use("/api/system-setting", systemSettingRoutes);
 app.use("/api/withdrawal", withdrawalRoutes);
+app.use("/api/message", messageRoutes);
 
 // =========================================
 //            Global Error Handler
@@ -113,8 +114,14 @@ app.use((err, req, res, next) => {
 // Database connection
 connectDB();
 
+// Create an HTTP server to work with Socket.IO
+const server = http.createServer(app);
+
+// Initialize Socket.IO with the server
+setupSocketIO(server);
+
 // Server running
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(
     chalk.bgYellow.bold(
       ` Server is listening at http://${getIPAddress()}:${port} `

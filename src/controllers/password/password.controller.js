@@ -101,7 +101,7 @@ export async function addBulkPasswords(req, res) {
 
     let { passwords } = req.body; // Expecting an array of passwords
     if (!Array.isArray(passwords) || passwords.length === 0) {
-      return badRequest(res, "Passwords must be a non-empty array.");
+      return validationError(res, "Passwords must be a non-empty array.");
     }
 
     // ✅ Validate each password
@@ -144,7 +144,7 @@ export async function updatePasswords(req, res) {
     const { passwords } = req.body;
 
     if (!Array.isArray(passwords) || passwords.length === 0) {
-      return badRequest(res, "Passwords must be a non-empty array.");
+      return validationError(res, "Passwords must be a non-empty array.");
     }
 
     // ✅ Validate each password

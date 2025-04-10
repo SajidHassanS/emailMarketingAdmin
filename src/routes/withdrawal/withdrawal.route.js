@@ -6,14 +6,17 @@ const router = express.Router();
 
 // Withdrawal routes
 router.route("/all").get(verifyToken, withdrawalCtrl.getAllWithdrawals); // Get all withdrawal requests
+// router.route("/handle").patch(verifyToken, withdrawalCtrl.handleWithdrawalApproval); // approve/reject pending bonus withdrawal request
 
-router.route("/approve").patch(verifyToken, withdrawalCtrl.approveWithdrawal); // approve pending withdrawal request
+router.route("/handle").patch(verifyToken, withdrawalCtrl.handleWithdrawal); // approve/reject pending bonus withdrawal request
 
-router.route("/reject").patch(verifyToken, withdrawalCtrl.rejectWithdrawal); // reject pending withdrawal request
+// router.route("/approve").patch(verifyToken, withdrawalCtrl.approveWithdrawal); // approve pending withdrawal request
+
+// router.route("/reject").patch(verifyToken, withdrawalCtrl.rejectWithdrawal); // reject pending withdrawal request
 
 router.route("/stats").get(verifyToken, withdrawalCtrl.getwithdrawalStats); // get withdrawal stats
 
-// router.route("/bonus/all").get(verifyToken, withdrawalCtrl.getAllWithdrawals); // Get all bonus withdrawal requests
+router.route("/bonus/all").get(verifyToken, withdrawalCtrl.getAllBonusWithdrawals); // Get all bonus withdrawal requests
 
 router.route("/bonus").patch(verifyToken, withdrawalCtrl.approveRejectBonusWithdrawal); // approve/reject pending bonus withdrawal request
 

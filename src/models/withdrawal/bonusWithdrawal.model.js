@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../../config/dbConfig.js";
 import Bonus from "./bonus.model.js";
 import User from "../user/user.model.js";
+import WithdrawalMethod from "./withdrawalMethod.model.js";
 
 const BonusWithdrawal = sequelize.define(
     "BonusWithdrawal",
@@ -28,6 +29,11 @@ const BonusWithdrawal = sequelize.define(
                 key: "uuid",
             },
             onDelete: "CASCADE",
+        },
+        withdrawalMethodUuid: {
+            type: DataTypes.UUID,
+            allowNull: false,
+            references: { model: "WithdrawalMethod", key: "uuid" },
         },
         status: {
             type: DataTypes.ENUM('pending', 'approved', 'withdrawn'),
@@ -64,4 +70,14 @@ User.hasMany(BonusWithdrawal, {
 BonusWithdrawal.belongsTo(User, {
     foreignKey: "userUuid",
     as: "user",
+});
+
+WithdrawalMethod.hasMany(BonusWithdrawal, {
+    foreignKey: "withdrawalMethodUuid",
+    as: "bonusWithdrawals",
+});
+
+BonusWithdrawal.belongsTo(WithdrawalMethod, {
+    foreignKey: "withdrawalMethodUuid",
+    as: "withdrawalMethod",
 });

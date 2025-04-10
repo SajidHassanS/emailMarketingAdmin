@@ -242,13 +242,11 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
 
 export async function getEmailStats(req, res) {
   try {
-    const userUid = req.userUid; // Assuming the user UUID is provided via the authenticated user (JWT)
-
     const [pendingCount, goodCount, badCount, totalCount] = await Promise.all([
-      Email.count({ where: { userUuid: userUid, status: "pending" } }),
-      Email.count({ where: { userUuid: userUid, status: "good" } }),
-      Email.count({ where: { userUuid: userUid, status: "bad" } }),
-      Email.count({ where: { userUuid: userUid } }),
+      Email.count({ where: { status: "pending" } }),
+      Email.count({ where: { status: "good" } }),
+      Email.count({ where: { status: "bad" } }),
+      Email.count(),
     ]);
 
     const stats = {
