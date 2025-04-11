@@ -22,6 +22,8 @@ import { nodeEnv, port } from "./config/initialConfig.js";
 import { connectDB } from "./config/dbConfig.js";
 import { getIPAddress } from "./utils/utils.js";
 import { setupSocketIO } from "./socketConfig.js";
+import session from "express-session";
+import { ensureSystemAdminExists } from "./config/initadmin.js";
 import "./models/models.js";
 import authRoutes from "./routes/admin/auth.route.js";
 import profileRoutes from "./routes/admin/profile.route.js";
@@ -40,7 +42,6 @@ const app = express();
 // app.use(passport.initialize());
 
 // If you plan to use session-based flows (optional with JWT):
-import session from "express-session";
 app.use(
   session({ secret: "yoursecret", resave: false, saveUninitialized: false })
 );
@@ -97,7 +98,7 @@ app.use("/api/password", passwordRoutes);
 app.use("/api/email", emailRoutes);
 app.use("/api/system-setting", systemSettingRoutes);
 app.use("/api/withdrawal", withdrawalRoutes);
-app.use("/api/message", messageRoutes);
+app.use("/api/chat", messageRoutes);
 
 // =========================================
 //            Global Error Handler
@@ -113,6 +114,8 @@ app.use((err, req, res, next) => {
 
 // Database connection
 connectDB();
+
+await ensureSystemAdminExists(); // Ensure system admin exists
 
 // Create an HTTP server to work with Socket.IO
 const server = http.createServer(app);

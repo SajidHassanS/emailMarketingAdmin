@@ -1,15 +1,16 @@
 import models from "../models/models.js";
 const { Message } = models
 
-export const saveMessageToDB = async ({ senderUuid, receiverUuid, content, senderType, receiverType }) => {
+export const saveMessageToDB = async ({ senderUuid, senderType, receiverUuid, receiverType, content, isNotification = false }) => {
     try {
         // Save the message to the database
         const savedMessage = await Message.create({
             senderUuid,
-            receiverUuid,
-            content,
             senderType,
+            receiverUuid,
             receiverType,
+            content,
+            isNotification,
         });
 
         // Return the saved message

@@ -11,8 +11,15 @@ router
     .get(verifyToken, messageCtrl.getUsersChattedWithAdmin)
 
 router
-    .route("/")
-    .get(verifyToken, messageCtrl.getMessages)
-    .post(verifyToken, messageCtrl.sendMessages)
+    .route("/messages")
+    .get(verifyToken, messageCtrl.getUserMessages)
+
+router
+    .route("/unread-count")
+    .get(verifyToken, messageCtrl.getUnreadMessageCount)
+
+router
+    .route("/mark-as-read")
+    .post(verifyToken, messageCtrl.markMessagesAsRead)
 
 export default router;

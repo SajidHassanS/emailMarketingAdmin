@@ -1,15 +1,13 @@
 import { Server } from "socket.io";
-import { saveMessageToDB } from "../src/utils/messageUtils.js"; // Assuming this is the file where you save messages
-import { Op } from "sequelize";
-import models from "./models/models.js";
+import jwt from "jsonwebtoken";
 import chalk from "chalk";
-const { Message } = models
+import { saveMessageToDB } from "../src/utils/messageUtils.js"; // Assuming this is the file where you save messages
 
 export const setupSocketIO = (server) => {
     // Initialize Socket.IO
     const io = new Server(server, {
         cors: {
-            origin: process.env.NODE_ENV === "production" ? process.env.DOMAIN : "*", // Set this in your .env file
+            origin: process.env.NODE_ENV === "production" ? process.env.DOMAIN : "*",
         },
     });
 
@@ -17,49 +15,57 @@ export const setupSocketIO = (server) => {
     io.on("connection", (socket) => {
         console.log("User connected:", socket.id);
 
-        // Listen for message events
-        // socket.on("sendMessage", (message) => {
-        //     console.log("Received message:", message);
-        //     // Optionally send a message back to the client
-        //     socket.emit("receiveMessage", { message: "Message received!" });
-        // });
+        const token = socket.handshake.query.token;
+        if (!token) {
+            console.log("No token provided.");
+            socket.disconnect();
+            return;
+        }
+
+        let senderUuid;
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+            senderUuid = decoded.userUid;
+            socket.join(senderUuid); // Join room based on UUID
+            console.log(chalk.green(`✅ Socket ${socket.id} joined room: ${senderUuid}`));
+        } catch (err) {
+            console.error("❌ Token verification failed:", err);
+            socket.disconnect();
+            return;
+        }
 
 
-        // Listen for 'sendMessage' event
+        // 🎯 Handle sending messages
         socket.on("sendMessage", async (data) => {
-            console.log("sendMessage done:", data);
-            // Extract token from the socket handshake
-            const token = socket.handshake.query.token;  // Get the token sent during the connection
-
-            if (!token) {
-                console.log("No token provided.");
-                socket.disconnect();
-                return;
-            }
             try {
-                // Verify and decode the token to get adminUuid
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);  // Ensure the secret key matches your JWT signing key
-                const adminUuid = decoded.adminUuid;
+                if (!data.receiverUuid || !data.senderType || !data.content) {
+                    socket.emit("messageSent", { success: false, error: "Missing fields" });
+                    return;
+                }
 
-                console.log("Admin UUID extracted from token:", adminUuid);
-                console.log(chalk.yellow(`Admin (UUID: ${adminUuid}) is sending the message`));  // Log admin message sending
+                // Determine receiver type
+                const receiverType = data.senderType === "admin" ? "user" : "admin";
 
-                // Save the message to the database
                 const savedMessage = await saveMessageToDB({
-                    senderUuid: req.adminUid,
-                    receiverUuid: data.uuid,
+                    senderUuid,
+                    senderType: data.senderType,
+                    receiverUuid: data.receiverUuid,
+                    receiverType,
                     content: data.content,
-                    senderType: "admin",
-                    receiverType: "user",
+                    isNotification: data.isNotification || false
                 });
 
-                // Emit the saved message to the receiver's socket
+                // Send to receiver's room
                 io.to(data.receiverUuid).emit("receiveMessage", savedMessage);
 
-                // Optionally, send acknowledgment to the sender (admin)
-                io.to(data.senderUuid).emit("messageSent", savedMessage);
+                // Acknowledge sender
+                socket.emit("messageSent", { success: true, data: savedMessage });
+
+                console.log(chalk.yellow(`📩 Message from ${senderUuid} to ${data.receiverUuid} sent.`));
             } catch (error) {
-                console.error("Error saving message:", error);
+                console.error("❌ Error sending message:", error);
+                socket.emit("messageSent", { success: false, error: "Failed to send message." });
             }
         });
 

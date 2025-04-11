@@ -2,12 +2,14 @@ import { Op } from "sequelize";
 import models from "../../models/models.js";
 import { catchError, frontError, notFound, successOk, successOkWithData } from "../../utils/responses.js";
 import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
-const { User, Admin, Message } = models
+const { User, Message } = models
 
 
 export const getUsersChattedWithAdmin = async (req, res) => {
     try {
         const adminUuid = req.adminUid
+
+        console.log("===== adminUuid ===== : ", adminUuid);
 
         // Fetch distinct users who have had conversations with the admin
         const users = await Message.findAll({
@@ -22,30 +24,43 @@ export const getUsersChattedWithAdmin = async (req, res) => {
                     model: User,
                     as: "senderByUser", // If the user is the sender
                     attributes: ["uuid", "username"],
-                    where: { uuid: { [Op.ne]: adminUuid } }, // Exclude admin from being returned as a user
                 },
                 {
                     model: User,
                     as: "receiverByUser", // If the user is the receiver
                     attributes: ["uuid", "username"],
-                    where: { uuid: { [Op.ne]: adminUuid } },
                 },
             ],
-            distinct: true, // Ensures that we only get distinct users
+            distinct: true, // Ensures that we only get distinct results
             order: [["createdAt", "DESC"]], // Order by most recent message
+            attributes: [], // We want to select the distinct user IDs
+        });
+        console.log("===== users ===== : ", users);
+
+        // Extracting distinct users (sender or receiver) from the result set
+        const distinctUsers = new Map();
+
+        // Loop through all messages and add unique users to the map
+        users.forEach((message) => {
+            const sender = message.senderByUser;
+            const receiver = message.receiverByUser;
+
+            if (sender && !distinctUsers.has(sender.uuid)) {
+                distinctUsers.set(sender.uuid, sender);
+            }
+
+            if (receiver && !distinctUsers.has(receiver.uuid)) {
+                distinctUsers.set(receiver.uuid, receiver);
+            }
         });
 
-        // Extract distinct users from the result
-        const distinctUsers = users.map((message) => {
-            const user = message.senderByUser || message.receiverByUser;
-            return {
-                uuid: user.uuid,
-                name: user.username,
-            };
-        });
+        // Convert the map values (distinct users) to an array
+        const uniqueUsers = Array.from(distinctUsers.values());
+
+        console.log("===== uniqueUsers ===== : ", uniqueUsers);
 
         // Return the list of users
-        return successOkWithData(res, "Users fetched succesffully.", distinctUsers)
+        return successOkWithData(res, "Users fetched succesffully.", uniqueUsers)
     } catch (error) {
         console.error("Error fetching users chatted with admin:", error);
         return catchError(res, error)
@@ -53,23 +68,26 @@ export const getUsersChattedWithAdmin = async (req, res) => {
 };
 
 // Controller to get messages
-export const getMessages = async (req, res) => {
+export const getUserMessages = async (req, res) => {
     try {
-
         const adminUuid = req.adminUid; // Admin's UUID
 
-        const reqQueryFields = queryReqFields(req, res, ["userUuid"]);
+        const reqQueryFields = queryReqFields(req, res, ["uuid"]);
         if (reqQueryFields.error) return reqQueryFields.response;
 
-        const { userUuid } = req.query
+        const { uuid, page = 1, pageSize = 10, search = "" } = req.query; // Pagination params (page, pageSize) and optional search
+
+        // Calculate offset for pagination
+        const offset = (page - 1) * pageSize;
 
         // Fetch messages exchanged between the admin and the specified user
         const messages = await Message.findAll({
             where: {
                 [Op.or]: [
-                    { senderUuid: adminUuid, receiverUuid: userUuid },
-                    { senderUuid: userUuid, receiverUuid: adminUuid }
+                    { senderUuid: adminUuid, receiverUuid: uuid },
+                    { senderUuid: uuid, receiverUuid: adminUuid }
                 ],
+                content: { [Op.iLike]: `%${search}%` }, // Optional search by content (case-insensitive)
             },
             include: [
                 {
@@ -86,69 +104,99 @@ export const getMessages = async (req, res) => {
                 },
             ],
             order: [["createdAt", "ASC"]], // Order by message creation date (ascending)
+            limit: pageSize, // Limit results per page
+            offset: offset, // Skip previous pages
         });
 
-        // Format the messages into a desired structure (optional)
+        // Fetch the total count of messages to calculate total pages
+        const totalMessages = await Message.count({
+            where: {
+                [Op.or]: [
+                    { senderUuid: adminUuid, receiverUuid: uuid },
+                    { senderUuid: uuid, receiverUuid: adminUuid }
+                ],
+                content: { [Op.iLike]: `%${search}%` }, // Optional search by content (case-insensitive)
+            }
+        });
+
+        // Calculate the total number of pages
+        const totalPages = Math.ceil(totalMessages / pageSize);
+
+        // Format the messages into a desired structure
         const formattedMessages = messages.map((message) => ({
             uuid: message.uuid,
-            senderUuid: message.senderUuid,
-            senderUsername: message.senderByUser ? message.senderByUser.username : "Admin",
-            receiverUuid: message.receiverUuid,
-            receiverUsername: message.receiverByUser ? message.receiverByUser.username : "Admin",
+            senderUsername: message.senderType === "admin" ? message.senderByAdmin?.username || "Admin" : message.senderByUser?.username || "User",
+            receiverUsername: message.receiverType === "admin" ? message.receiverByAdmin?.username || "Admin" : message.receiverByUser?.username || "User",
             content: message.content,
             isNotification: message.isNotification,
             createdAt: message.createdAt,
         }));
 
         // Return the list of messages using the custom response function
-        return successOkWithData(res, "Successfully fetched messages with user", formattedMessages);
+        return successOkWithData(res, "Successfully fetched messages with user", {
+            messages: formattedMessages,
+            pagination: {
+                currentPage: page,
+                pageSize: pageSize,
+                totalPages: totalPages,
+                totalMessages: totalMessages
+            }
+        });
     } catch (error) {
         console.error("Error fetching messages with user:", error);
-        catchError(res, error)
+        catchError(res, error);
     }
 };
 
-// Controller to get messages
-export const sendMessages = async (req, res) => {
+export const getUnreadMessageCount = async (req, res) => {
     try {
+        const adminUuid = req.adminUid;
 
-        const adminUuid = req.adminUid; // Admin's UUID
-
-        const reqQueryFields = queryReqFields(req, res, ["userUuid"]);
+        const reqQueryFields = queryReqFields(req, res, ["uuid"]);
         if (reqQueryFields.error) return reqQueryFields.response;
 
-        const reqBodyFields = bodyReqFields(req, res, ["content"]);
-        if (reqBodyFields.error) return reqBodyFields.response;
+        const { uuid } = req.query;
 
-        const { userUuid } = req.query
-        const { content } = req.body
-
-        // Check if user exists
-        const user = await User.findOne({ where: { uuid: userUuid } });
-        if (!user) return frontError(res, "Invalid userUuid.")
-
-        // Validate
-        if (!content || content.trim() === "") {
-            return frontError(res, "this is required.", "content");
-        }
-
-        console.log("===== adminUuid ===== : ", adminUuid);
-        console.log("===== userUuid ===== : ", userUuid);
-        console.log("===== content ===== : ", content);
-
-        // Create message
-        await Message.create({
-            senderUuid: adminUuid,
-            senderType: "admin",
-            receiverUuid: userUuid,
-            receiverType: "user",
-            content,
-            isNotification: false,
+        const count = await Message.count({
+            where: {
+                senderUuid: uuid,
+                receiverUuid: adminUuid,
+                isRead: false,
+            },
         });
 
-        return successOk(res, "Message sent successfully.");
+        return successOkWithData(res, "Unread message count fetched.", { count });
     } catch (error) {
-        console.error("Error fetching messages with user:", error);
-        catchError(res, error)
+        console.error("Error fetching unread message count:", error);
+        catchError(res, error);
     }
 };
+
+
+export const markMessagesAsRead = async (req, res) => {
+    try {
+        const adminUuid = req.adminUid;
+
+        const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+        if (reqQueryFields.error) return reqQueryFields.response;
+
+        const { uuid } = req.query;
+
+        await Message.update(
+            { isRead: true },
+            {
+                where: {
+                    senderUuid: uuid,
+                    receiverUuid: adminUuid,
+                    isRead: false,
+                },
+            }
+        );
+
+        return successOk(res, "Messages marked as read.");
+    } catch (error) {
+        console.error("Error marking messages as read:", error);
+        catchError(res, error);
+    }
+};
+

@@ -31,6 +31,10 @@ const Message = sequelize.define(
             type: DataTypes.TEXT,
             allowNull: false,
         },
+        isRead: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
         isNotification: {
             type: DataTypes.BOOLEAN,
             defaultValue: false,
