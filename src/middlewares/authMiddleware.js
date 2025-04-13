@@ -15,13 +15,14 @@ export default async function verifyToken(req, res, next) {
   try {
     // Extract the token from the Authorization header
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) return UnauthorizedError(res, "No token, authorization denied.");
+    if (!token)
+      return UnauthorizedError(res, "No token, authorization denied.");
 
     const decoded = jwt.verify(token, jwtSecret);
 
-    console.log("================================");
-    console.log("===== decoded ===== : ", decoded);
-    console.log("================================");
+    // console.log("================================");
+    // console.log("===== decoded ===== : ", decoded);
+    // console.log("================================");
     if (decoded.token !== "access")
       return UnauthorizedError(res, "Invalid token.");
 
