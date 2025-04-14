@@ -26,9 +26,6 @@ const assignPasswords = async () => {
     order: [["uuid", "ASC"]],
   });
 
-  console.log("===== users ==== : ", users.length);
-  console.log("===== passwords ==== : ", passwords.length);
-
   if (passwords.length === 0) {
     console.log("No active passwords available!");
     return;
@@ -36,7 +33,6 @@ const assignPasswords = async () => {
 
   for (let i = 0; i < users.length; i++) {
     const passwordIndex = i % passwords.length; // Round-robin logic
-    console.log("===== passwordIndex ==== : ", passwordIndex);
     await users[i].update({ passwordUuid: passwords[passwordIndex].uuid });
   }
   console.log("Passwords reassigned successfully!");

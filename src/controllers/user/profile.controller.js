@@ -91,8 +91,6 @@ export async function updateProfile(req, res) {
     const excludedFields = ["profileImg"];
     const fieldsToUpdateLowered = convertToLowercase(fieldsToUpdate, excludedFields);
 
-    console.log(" ===== fieldsToUpdate ===== ", fieldsToUpdate)
-    console.log(" ===== fieldsToUpdateLowered ===== ", fieldsToUpdateLowered)
     await Admin.update(fieldsToUpdate, {
       where: { uuid: adminUid },
     });

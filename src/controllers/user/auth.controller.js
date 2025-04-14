@@ -91,8 +91,6 @@ export async function registerAdmin(req, res) {
     adminData.role = role
     adminData.verified = true // chnage this based on approval flow
 
-    console.log("===== adminData ===== : ", adminData);
-
     // ✅ Create New User in Database
     await Admin.create(adminData);
 
@@ -309,14 +307,11 @@ export async function logoutUser(req, res) {
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) return validationError(res, "Authorization token is required.");
 
-    console.log("===== token ===== : ", token);
-
     // Verify JWT token (instead of decode)
     let decodedToken;
     try {
       decodedToken = jwt.verify(token, jwtSecret);
     } catch (err) {
-      console.log("===== err ===== : ", err);
       return validationError(res, "Invalid or expired token.");
     }
 

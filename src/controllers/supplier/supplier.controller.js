@@ -66,8 +66,6 @@ export async function getSuppliersList(req, res) {
       raw: true,
     });
 
-    console.log("===== supplierList ===== : ", supplierList);
-
     // Get unique 'createdBy' UUIDs from the supplier list
     const createdByUuids = [
       ...new Set(
@@ -78,10 +76,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-          where: { uuid: createdByUuids },
-          attributes: ["uuid", "username"],
-          raw: true, // Convert to plain objects
-        })
+        where: { uuid: createdByUuids },
+        attributes: ["uuid", "username"],
+        raw: true, // Convert to plain objects
+      })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -179,8 +177,6 @@ export async function addNewSupplier(req, res) {
     userData.bonus = 0; // get bonus set by admin
     userData.active = true; // user created by admin
     userData.createdBy = adminUid; // user created by admin
-
-    console.log("===== userData ===== : ", userData);
 
     // ✅ Create New User in Database
     await User.create(userData);

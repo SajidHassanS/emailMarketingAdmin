@@ -91,7 +91,6 @@ export const getUsersForNewChat = async (req, res) => {
 export const getUsersChattedWithAdmin = async (req, res) => {
   try {
     const adminUuid = req.adminUid;
-    console.log("===== adminUuid ===== : ", adminUuid);
 
     const messages = await Message.findAll({
       where: {
@@ -158,8 +157,6 @@ export const getUsersChattedWithAdmin = async (req, res) => {
         };
       })
     );
-
-    console.log("===== enrichedUsers ===== : ", enrichedUsers);
 
     return successOkWithData(res, "Users fetched successfully.", enrichedUsers);
   } catch (error) {

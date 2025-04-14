@@ -212,10 +212,6 @@ export async function handleWithdrawal(req, res) {
 
     const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
 
-    console.log("===== req.body ===== : ", req.body);
-    console.log("===== action ===== : ", action);
-
-
     // Validate action type
     if (!['approve', 'reject'].includes(action)) {
       return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
@@ -223,9 +219,6 @@ export async function handleWithdrawal(req, res) {
 
     // Fetch the withdrawal request by UUID
     const withdrawal = await Withdrawal.findOne({ where: { uuid: withdrawalUuid } });
-
-    console.log("===== withdrawal ===== : ", withdrawal);
-
 
     if (!withdrawal) {
       return frontError(res, "Withdrawal request not found.");
