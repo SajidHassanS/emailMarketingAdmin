@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO JWT Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h2>Socket.IO JWT Connection Test</h2>
+    <div id="status">Connecting...</div>
+
+    <script>
+      const token =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyVWlkIjoiNTllMWJmNDctZGEwNi00MmQ4LWIxZDktNDlhYzY3YjgwY2E3IiwidG9rZW4iOiJhY2Nlc3MiLCJpYXQiOjE3NDQ0NDczNDAsImV4cCI6MTc0NzAzOTM0MH0.aJ95jlq8E0SGijzZFlhZYEYSCt7oBLJI_wwlNKz9GKw"; // Replace with a real JWT token
+      const socket = io("http://192.168.43.204:7001", {
+        query: { token },
+        transports: ["websocket"],
+      });
+
+      socket.on("connect", () => {
+        document.getElementById("status").innerText = "✅ Connected to server!";
+        console.log("Socket connected:", socket.id);
+      });
+
+      socket.on("connect_error", (err) => {
+        document.getElementById("status").innerText = "❌ Connection failed!";
+        console.error("Connection error:", err.message);
+      });
+
+      socket.on("messageSent", (data) => {
+        console.log("Message sent result:", data);
+      });
+
+      socket.on("receiveMessage", (msg) => {
+        console.log("Received message:", msg);
+      });
+
+      // Test sending a message
+      setTimeout(() => {
+        socket.emit("sendMessage", {
+          receiverUuid: "06f56f5f-accc-4736-872a-49b955a9e8c4", // Replace with actual user UUID
+          senderType: "admin",
+          content: "Hello from HTML test!",
+          isNotification: false,
+        });
+      }, 2000);
+    </script>
+  </body>
+</html>
