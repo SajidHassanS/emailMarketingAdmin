@@ -22,6 +22,8 @@ import {
 import User from "../../models/user/user.model.js";
 import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
 import Admin from "../../models/admin/admin.model.js";
+import Password from "../../models/password/password.model.js";
+import Phone from "../../models/user/phone.model.js";
 
 // ========================= Helping Functions ============================
 
@@ -63,7 +65,7 @@ export async function getSuppliersList(req, res) {
       //     active: true
       // },
       order: [["createdAt", "Desc"]],
-      raw: true,
+      raw: false,
     });
 
     // Get unique 'createdBy' UUIDs from the supplier list
@@ -76,10 +78,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-        where: { uuid: createdByUuids },
-        attributes: ["uuid", "username"],
-        raw: true, // Convert to plain objects
-      })
+          where: { uuid: createdByUuids },
+          attributes: ["uuid", "username"],
+          raw: true, // Convert to plain objects
+        })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -87,17 +89,54 @@ export async function getSuppliersList(req, res) {
       adminDetails.map((admin) => [admin.uuid, admin])
     );
 
-    // Attach admin username to suppliers
-    const suppliersWithAdmin = supplierList.map((supplier) => ({
-      ...supplier,
-      createdBy: supplier.createdBy
-        ? adminMap[supplier.createdBy]?.username || supplier.createdBy
-        : null,
-    }));
+    // // Attach admin username to suppliers
+    // const suppliersWithAdmin = supplierList.map((supplier) => ({
+    //   ...supplier,
+    //   createdBy: supplier.createdBy
+    //     ? adminMap[supplier.createdBy]?.username || supplier.createdBy
+    //     : null,
+    // }));
+
+    // return successOkWithData(
+    //   res,
+    //   "Suppliers retrieved successfully.",
+    //   suppliersWithAdmin
+    // );
+    // Get active passwords
+    const passwords = await Password.findAll({
+      where: { active: true },
+      order: [["uuid", "ASC"]],
+    });
+
+    // Get user count once to calculate round-robin base index
+    const totalUsers = await User.count();
+
+    let passwordAssignCounter = totalUsers;
+
+    const suppliersWithAdmin = await Promise.all(
+      supplierList.map(async (supplier) => {
+        // Assign password if missing
+        if (!supplier.passwordUuid && passwords.length > 0) {
+          const passwordIndex = passwordAssignCounter % passwords.length;
+          const assignedPassword = passwords[passwordIndex];
+
+          await supplier.update({ passwordUuid: assignedPassword.uuid });
+
+          passwordAssignCounter++;
+        }
+
+        return {
+          ...supplier.toJSON(),
+          createdBy: supplier.createdBy
+            ? adminMap[supplier.createdBy]?.username || supplier.createdBy
+            : null,
+        };
+      })
+    );
 
     return successOkWithData(
       res,
-      "Suppliers retrieved successfully.",
+      "Suppliers retrieved and updated successfully.",
       suppliersWithAdmin
     );
   } catch (error) {
@@ -203,10 +242,22 @@ export async function getSupplierDetail(req, res) {
     const supplier = await User.findByPk(uuid);
     if (!supplier) return frontError(res, "Invalid uuid.");
 
+    // Fetch phones associated with the supplier
+    const phones = await Phone.findAll({
+      where: { userUuid: uuid },
+      attributes: ["countryCode", "phone"],
+    });
+
+    // Attach phones to the supplier response
+    const supplierData = {
+      ...supplier.toJSON(),
+      phones,
+    };
+
     return successOkWithData(
       res,
       "Supplier detail retrieved successfully.",
-      supplier
+      supplierData
     );
   } catch (error) {
     return catchError(res, error);

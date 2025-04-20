@@ -23,7 +23,7 @@ const storage = diskStorage({
   },
   filename: (req, file, cb) => {
     const fileExtension = extname(file.originalname);
-    const filename = `${req.userUid}${fileExtension}`;
+    const filename = `${req.adminUid}${fileExtension}`;
     cb(null, filename);
   },
 });
