@@ -21,20 +21,20 @@ const BonusWithdrawal = sequelize.define(
       },
       onDelete: "CASCADE",
     },
-    userUuid: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: "Users",
-        key: "uuid",
-      },
-      onDelete: "CASCADE",
-    },
-    withdrawalMethodUuid: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "WithdrawalMethod", key: "uuid" },
-    },
+    // userUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: {
+    //     model: "Users",
+    //     key: "uuid",
+    //   },
+    //   onDelete: "CASCADE",
+    // },
+    // withdrawalMethodUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: { model: "WithdrawalMethod", key: "uuid" },
+    // },
     status: {
       type: DataTypes.ENUM("pending", "approved", "withdrawn"),
       defaultValue: "pending",
