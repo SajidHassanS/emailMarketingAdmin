@@ -1,41 +1,42 @@
-// Import required modules and configuration
-import chalk from "chalk";
 import { Sequelize } from "sequelize";
-import { dbUrl } from "./initialConfig.js";
+import chalk from "chalk";
 
-const sequelize = new Sequelize(dbUrl);
+// You can move these to a config file later
+const dbName = "project3";
+const dbUser = "postgres";
+const dbPass = "hassan526688";
+// const dbHost = "project3.c7q4kemc23tb.eu-north-1.rds.amazonaws.com";
+const dbHost = "project3.c7q4kemc23tb.eu-north-1.rds.amazonaws.com";
 
-// Async function to connect to the MongoDB database
+const sequelize = new Sequelize(dbName, dbUser, dbPass, {
+  host: dbHost,
+  port: 5432,
+  dialect: "postgres",
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+    },
+  },
+  logging: console.log, // Optional: shows SQL queries
+});
+
 export const connectDB = async () => {
   try {
-    // Connect to the database with the provided URL and name
+    console.log(chalk.cyan("▶ Connecting to database with manual config..."));
+    console.log("▶ Dialect Options:", sequelize.options.dialectOptions);
+
     await sequelize.authenticate();
 
-    // Log success message in green
-    console.log(`${chalk.green.bold("Connected to the database")}`);
     console.log(
-      `${chalk.green.bold(
-        "============================================================"
-      )}`
+      chalk.green.bold(`Connected to the database ${dbName} ${dbHost}`)
     );
     await sequelize.sync();
-
-    console.log(`${chalk.green.bold("Models synced successfully")}`);
-    console.log(
-      `${chalk.green.bold(
-        "============================================================"
-      )}`
-    );
+    console.log(chalk.green.bold("✅ Models synced successfully"));
   } catch (error) {
-    // Log error message in red and exit the application
-    console.log(`${chalk.red.bold("Error")} connecting to database `, error);
-    console.log(
-      `${chalk.green.bold(
-        "============================================================"
-      )}`
-    );
+    console.error(chalk.red.bold("❌ Error connecting to database:"), error);
     process.exit(1);
   }
 };
-// Export the connectDB function
+
 export default sequelize;
