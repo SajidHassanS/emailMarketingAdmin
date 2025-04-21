@@ -11,6 +11,7 @@ import WithdrawalMethod from "./withdrawal/withdrawalMethod.model.js";
 import Bonus from "./withdrawal/bonus.model.js";
 import BonusWithdrawal from "./withdrawal/bonusWithdrawal.model.js";
 import Message from "./message/message.model.js";
+import Phone from "./user/phone.model.js";
 
 const models = {
   User,
@@ -26,6 +27,7 @@ const models = {
   Bonus,
   BonusWithdrawal,
   Message,
+  Phone, // user phone model
 };
 
 export default models;

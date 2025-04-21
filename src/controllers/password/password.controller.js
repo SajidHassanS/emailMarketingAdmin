@@ -120,7 +120,41 @@ export async function addBulkPasswords(req, res) {
     }));
 
     await Password.bulkCreate(passwordData);
-    return created(res, `${passwords.length} passwords added successfully.`);
+
+    // ✅ Get newly created active passwords
+    const activePasswords = await Password.findAll({
+      where: { active: true },
+      order: [["uuid", "ASC"]],
+    });
+
+    if (activePasswords.length === 0) {
+      return created(
+        res,
+        "Passwords added, but none are active for assignment."
+      );
+    }
+
+    // ✅ Find users without passwords
+    const usersWithoutPassword = await User.findAll({
+      where: { passwordUuid: null },
+    });
+
+    let updatedCount = 0;
+    for (let i = 0; i < usersWithoutPassword.length; i++) {
+      const user = usersWithoutPassword[i];
+      const passwordIndex = i % activePasswords.length;
+      const passwordToAssign = activePasswords[passwordIndex];
+
+      await user.update({ passwordUuid: passwordToAssign.uuid });
+      updatedCount++;
+    }
+
+    return created(
+      res,
+      `${passwords.length} passwords added successfully. ${updatedCount} users were updated with new passwords.`
+    );
+
+    // return created(res, `${passwords.length} passwords added successfully.`);
   } catch (error) {
     console.log(error);
     if (error instanceof Sequelize.ValidationError) {

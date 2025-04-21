@@ -13,7 +13,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { domain } from "./config/initialConfig.js";
 // import passport from "./config/passport.js";
-import http from "http"; // This imports the http module
+import http from 'http';  // This imports the http module
 
 // =========================================
 //             Code Import
@@ -124,7 +124,7 @@ const server = http.createServer(app);
 setupSocketIO(server);
 
 // Server running
-app.listen(port, "0.0.0.0", () => {
+server.listen(port, () => {
   console.log(
     chalk.bgYellow.bold(
       ` Server is listening at http://${getIPAddress()}:${port} `
