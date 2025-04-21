@@ -10,15 +10,15 @@ const Phone = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    // userUuid: {
-    //   type: DataTypes.UUID,
-    //   allowNull: false,
-    //   references: {
-    //     model: "User",
-    //     key: "uuid",
-    //   },
-    //   onDelete: "CASCADE",
-    // },
+    userUuid: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: "User",
+        key: "uuid",
+      },
+      onDelete: "CASCADE",
+    },
     countryCode: {
       type: DataTypes.STRING,
       allowNull: false,
