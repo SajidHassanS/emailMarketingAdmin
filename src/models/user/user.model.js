@@ -31,9 +31,9 @@ const User = sequelize.define(
     referCode: {
       type: DataTypes.STRING,
     },
-    bonus: {
-      type: DataTypes.FLOAT,
-    },
+    // bonus: {
+    //   type: DataTypes.FLOAT,
+    // },
     active: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

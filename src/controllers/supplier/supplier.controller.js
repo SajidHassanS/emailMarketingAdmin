@@ -213,7 +213,7 @@ export async function addNewSupplier(req, res) {
     userData.countryCode = countryCode;
     userData.password = hashedPassword;
     if (referCode) userData.referCode = referCode;
-    userData.bonus = 0; // get bonus set by admin
+    // userData.bonus = 0; // get bonus set by admin
     userData.active = true; // user created by admin
     userData.createdBy = adminUid; // user created by admin
 
