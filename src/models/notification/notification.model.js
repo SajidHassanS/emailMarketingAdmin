@@ -20,11 +20,11 @@ const Notification = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
-    // userUuid: {
-    //   type: DataTypes.UUID,
-    //   allowNull: false,
-    //   references: { model: "User", key: "uuid" },
-    // },
+    userUuid: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "User", key: "uuid" },
+    },
     // Notification type: can be expanded for different categories like system, user-specific, warnings, etc.
     type: {
       type: DataTypes.ENUM(

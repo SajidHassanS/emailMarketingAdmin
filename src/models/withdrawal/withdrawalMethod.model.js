@@ -10,11 +10,11 @@ const WithdrawalMethod = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    userUuid: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "User", key: "uuid" },
-    },
+    // userUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: { model: "User", key: "uuid" },
+    // },
     methodType: {
       type: DataTypes.ENUM("easypaisa", "jazzcash", "bank"),
       allowNull: false,
