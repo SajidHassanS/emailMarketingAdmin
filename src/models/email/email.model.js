@@ -35,11 +35,11 @@ const Email = sequelize.define(
     remarks: {
       type: DataTypes.STRING,
     },
-    // userUuid: {
-    //   type: DataTypes.UUID,
-    //   allowNull: false,
-    //   references: { model: "User", key: "uuid" },
-    // },
+    userUuid: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: { model: "User", key: "uuid" },
+    },
     amount: {
       type: DataTypes.INTEGER,
       allowNull: true, // Optional on creation, added when approved
