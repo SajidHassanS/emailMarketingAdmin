@@ -12,6 +12,8 @@ router
   .get(verifyToken, emailCtrl.getAllEmails) // Temporary Get all email
   .patch(verifyToken, emailCtrl.updateEmailStatus); // Update email
 
+router.route("/bulk-insert").post(verifyToken, emailCtrl.bulkEmailEntry); // Bulk insert email's
+
 router
   .route("/bulk-update")
   .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByUuids); // Bulk update email's status

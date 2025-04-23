@@ -26,7 +26,7 @@ const Email = sequelize.define(
     },
     fileName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     emailScreenshot: {
       type: DataTypes.STRING, // email Screenshot (optional)

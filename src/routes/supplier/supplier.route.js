@@ -6,7 +6,19 @@ import { checkRole } from "../../middlewares/adminRole.middleware.js";
 const router = express.Router();
 
 // ✅ Get All Suppliers
-router.get("/list", verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.getSuppliersList);
+router.get(
+  "/list",
+  verifyToken,
+  checkRole(["superadmin", "admin"]),
+  jobCtrl.getSuppliersList
+);
+
+router.get(
+  "/simple-list",
+  verifyToken,
+  checkRole(["superadmin", "admin"]),
+  jobCtrl.getSuppliersSimpleList
+);
 
 // router
 //     .route("/")
@@ -15,18 +27,16 @@ router.get("/list", verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.get
 //     .patch(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.updateSupplierDetail)
 //     .delete(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.deleteSupplier);
 
-router.route("/")
-    .all(verifyToken, checkRole(["superadmin", "admin"])) // Apply middleware to all routes
-    .get(jobCtrl.getSupplierDetail)
-    .post(jobCtrl.addNewSupplier)
-    .patch(jobCtrl.updateSupplierDetail)
-    .delete(jobCtrl.deleteSupplier);
-
+router
+  .route("/")
+  .all(verifyToken, checkRole(["superadmin", "admin"])) // Apply middleware to all routes
+  .get(jobCtrl.getSupplierDetail)
+  .post(jobCtrl.addNewSupplier)
+  .patch(jobCtrl.updateSupplierDetail)
+  .delete(jobCtrl.deleteSupplier);
 
 // // ✅ Post Project (Employer)
 // router.post("/add", verifyToken, checkRole(["apprenticeship"]), jobCtrl.addProject);
-
-
 
 // // ✅ Update Project
 // router.patch("/update", verifyToken, checkRole(["apprenticeship"]), jobCtrl.updateProjectDetails);

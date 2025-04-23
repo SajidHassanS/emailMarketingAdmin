@@ -71,8 +71,8 @@ export async function addPassword(req, res) {
     const { password } = req.body;
 
     // ✅ Validate Password Format
-    const invalidPassword = validatePassword(password);
-    if (invalidPassword) return validationError(res, invalidPassword);
+    // const invalidPassword = validatePassword(password);
+    // if (invalidPassword) return validationError(res, invalidPassword);
 
     await Password.create({
       password,
@@ -101,17 +101,17 @@ export async function addBulkPasswords(req, res) {
     }
 
     // ✅ Validate each password
-    const invalidPasswords = passwords.filter((password) =>
-      validatePassword(password)
-    );
-    if (invalidPasswords.length > 0) {
-      return validationError(
-        res,
-        `Invalid passwords found: ${invalidPasswords.join(
-          ", "
-        )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
-      );
-    }
+    // const invalidPasswords = passwords.filter((password) =>
+    //   validatePassword(password)
+    // );
+    // if (invalidPasswords.length > 0) {
+    //   return validationError(
+    //     res,
+    //     `Invalid passwords found: ${invalidPasswords.join(
+    //       ", "
+    //     )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
+    //   );
+    // }
 
     // ✅ Prepare the bulk insert data
     const passwordData = passwords.map((password) => ({

@@ -5,6 +5,7 @@ import {
   notFound,
   frontError,
   successOk,
+  validationError,
 } from "../../utils/responses.js";
 import models from "../../models/models.js";
 const { User, Email, Notification } = models;
@@ -12,6 +13,9 @@ import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
 import DuplicateEmail from "../../models/email/duplicateEmail.model.js";
 import SystemSetting from "../../models/systemSetting/systemSetting.model.js";
 import { createNotification } from "../../utils/notificationUtils.js";
+import Password from "../../models/password/password.model.js";
+import Admin from "../../models/admin/admin.model.js";
+import { saveMessageToDB } from "../../utils/messageUtils.js"; // Assuming this is the file where you save messages
 
 // ========================= Helping Function ============================
 
@@ -164,6 +168,159 @@ export async function updateEmailStatus(req, res) {
   } catch (error) {
     console.log("===== Error ===== : ", error);
 
+    return catchError(res, error);
+  }
+}
+
+// ===================== Bulk Update Email Status ===========================
+
+export async function bulkEmailEntry(req, res) {
+  try {
+    // const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    // if (reqQueryFields.error) return reqQueryFields.response;
+
+    const reqBodyFields = bodyReqFields(req, res, [
+      "userUuid",
+      "emails",
+      "status",
+    ]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    // const { uuid } = req.query;
+    const { userUuid, emails, status, remarks } = req.body;
+
+    // Parse emails from string: comma or newline separated
+    const emailList = emails
+      .split(/[\n,]+/)
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+
+    if (emailList.length === 0)
+      return validationError(res, "No valid emails provided.");
+
+    // Get user with password
+    const user = await User.findByPk(userUuid, {
+      attributes: ["uuid", "passwordUuid"],
+      include: {
+        model: Password,
+        attributes: ["uuid", "password"],
+      },
+    });
+
+    if (!user || !user.Password || !user.Password.password)
+      return validationError(
+        res,
+        "User not found or user has no assigned password. Please add passwords first."
+      );
+
+    const existingEmails = await Email.findAll({
+      where: { email: emailList },
+      attributes: ["uuid", "email", "status"],
+    });
+
+    const existingEmailList = existingEmails.map((e) => e.email);
+    const newEmails = emailList.filter(
+      (email) => !existingEmailList.includes(email)
+    );
+
+    let rewardAmount = 0;
+
+    // If the status is "good", get reward value
+    if (status === "good") {
+      const defaultReward = await SystemSetting.findOne({
+        where: { key: "default_email_reward" },
+      });
+      rewardAmount = defaultReward ? parseInt(defaultReward.value) : 20;
+    }
+
+    const emailEntries = [];
+
+    for (const email of newEmails) {
+      emailEntries.push({
+        email,
+        password: user.Password.password,
+        userUuid: userUuid,
+        status: status,
+        amount: status === "good" ? rewardAmount : 0,
+        remarks,
+      });
+    }
+
+    // Bulk insert
+    if (emailEntries.length > 0) await Email.bulkCreate(emailEntries);
+
+    // Log duplicates in DuplicateEmail table
+    for (const existing of existingEmails) {
+      await DuplicateEmail.create({
+        emailUuid: existing.uuid,
+        uploadedByUuid: userUuid,
+        fileName: "manual-entry",
+      });
+    }
+
+    // Admin Notification
+    let systemAdmin = await Admin.findOne({
+      where: { username: "systemadmin" },
+    });
+
+    if (!systemAdmin) systemAdmin = await Admin.findOne();
+
+    // Notify user
+    if (existingEmailList.length > 0) {
+      const title =
+        existingEmailList.length === 1
+          ? "Duplicate Email Found"
+          : "Duplicate Emails Found";
+
+      let message = `${existingEmailList.length} duplicate email(s) detected.`;
+      if (newEmails.length > 0) {
+        message += ` The remaining ${newEmails.length} email(s) were uploaded successfully.`;
+      }
+
+      await createNotification({
+        userUuid,
+        title,
+        message,
+        type: "duplicate_email",
+        metadata: { duplicateEmails: existingEmailList },
+      });
+
+      if (systemAdmin) {
+        await saveMessageToDB({
+          senderUuid: systemAdmin.uuid,
+          senderType: "admin",
+          receiverUuid: userUuid,
+          receiverType: "user",
+          content: `${message} ----- duplicateEmails: ${existingEmailList}`,
+          isNotification: true,
+        });
+      }
+
+      return validationError(res, message);
+    }
+
+    // All emails were new
+    await createNotification({
+      userUuid,
+      title: "New Email(s) Uploaded",
+      message: `${newEmails.length} new email(s) have been successfully uploaded.`,
+      type: "success",
+    });
+
+    if (systemAdmin) {
+      await saveMessageToDB({
+        senderUuid: systemAdmin.uuid,
+        senderType: "admin",
+        receiverUuid: userUuid,
+        receiverType: "user",
+        content: `New Email(s) Uploaded ----- ${newEmails.length} new email(s) have been successfully uploaded.`,
+        isNotification: true,
+      });
+    }
+
+    return successOk(res, "Emails uploaded successfully.");
+  } catch (error) {
+    console.log("===== Error ===== :", error);
     return catchError(res, error);
   }
 }

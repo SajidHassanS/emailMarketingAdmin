@@ -145,6 +145,27 @@ export async function getSuppliersList(req, res) {
   }
 }
 
+// ========================= Set Simple Supplier List  ============================
+
+export async function getSuppliersSimpleList(req, res) {
+  try {
+    const suppliers = await User.findAll({
+      attributes: ["uuid", "username"],
+      order: [["username", "ASC"]],
+      raw: true,
+    });
+
+    return successOkWithData(
+      res,
+      "Suppliers list retrieved successfully.",
+      suppliers
+    );
+  } catch (error) {
+    console.error("Error fetching suppliers list:", error);
+    return catchError(res, error);
+  }
+}
+
 // ========================= Add New Supplier ============================
 export async function addNewSupplier(req, res) {
   try {
@@ -213,7 +234,7 @@ export async function addNewSupplier(req, res) {
     userData.countryCode = countryCode;
     userData.password = hashedPassword;
     if (referCode) userData.referCode = referCode;
-    // userData.bonus = 0; // get bonus set by admin
+    userData.bonus = 0; // get bonus set by admin
     userData.active = true; // user created by admin
     userData.createdBy = adminUid; // user created by admin
 
