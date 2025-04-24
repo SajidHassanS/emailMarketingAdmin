@@ -177,18 +177,18 @@ export async function updatePasswords(req, res) {
       return validationError(res, "Passwords must be a non-empty array.");
     }
 
-    // ✅ Validate each password
-    const invalidPasswords = passwords.filter((password) =>
-      validatePassword(password)
-    );
-    if (invalidPasswords.length > 0) {
-      return validationError(
-        res,
-        `Invalid passwords found: ${invalidPasswords.join(
-          ", "
-        )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
-      );
-    }
+    // // ✅ Validate each password
+    // const invalidPasswords = passwords.filter((password) =>
+    //   validatePassword(password)
+    // );
+    // if (invalidPasswords.length > 0) {
+    //   return validationError(
+    //     res,
+    //     `Invalid passwords found: ${invalidPasswords.join(
+    //       ", "
+    //     )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
+    //   );
+    // }
 
     // ✅ Check if any passwords already exist in the database
     const existingPasswords = await Password.findAll({

@@ -46,16 +46,39 @@ const generateUserTitle = async (category, userUid, username) => {
 
 export async function getSuppliersList(req, res) {
   try {
-    const { status, district, trade, sector, duration, deadline } = req.query;
+    const {
+      active,
+      username,
+      countryCode,
+      phone,
+      userTitle,
+      createdByUuid,
+      createdFrom,
+      createdTo,
+      updatedFrom,
+      updatedTo
+    } = req.query;
+
+    console.log("===== req.query ===== : ", req.query)
 
     const where = {};
-    // where.active = true;
-    // if (status) where.status = status;
-    // // ✅ Define filters for associated project details
-    // if (district) where.district = district;
-    // if (trade) where.trade = trade;
-    // if (sector) where.sector = sector;
-    // if (duration) where.duration = duration;
+    if (active !== undefined) where.active = active === "true";
+    if (username) where.username = { [Op.iLike]: `%${username}%` };
+    if (countryCode) where.countryCode = countryCode;
+    if (phone) where.phone = { [Op.iLike]: `%${phone}%` };
+    if (userTitle) where.userTitle = { [Op.iLike]: `%${userTitle}%` };
+    if (createdByUuid) where.createdBy = createdByUuid;
+    if (createdFrom || createdTo) {
+      where.createdAt = {};
+      if (createdFrom) where.createdAt[Op.gte] = new Date(createdFrom);
+      if (createdTo) where.createdAt[Op.lte] = new Date(createdTo);
+    }
+
+    if (updatedFrom || updatedTo) {
+      where.updatedAt = {};
+      if (updatedFrom) where.updatedAt[Op.gte] = new Date(updatedFrom);
+      if (updatedTo) where.updatedAt[Op.lte] = new Date(updatedTo);
+    }
 
     // ✅ Filter by project deadline (applications where project deadline is <= given date)
     // if (deadline) where.deadline = { [Op.lte]: deadline };
@@ -78,10 +101,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-          where: { uuid: createdByUuids },
-          attributes: ["uuid", "username"],
-          raw: true, // Convert to plain objects
-        })
+        where: { uuid: createdByUuids },
+        attributes: ["uuid", "username"],
+        raw: true, // Convert to plain objects
+      })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -162,6 +185,28 @@ export async function getSuppliersSimpleList(req, res) {
     );
   } catch (error) {
     console.error("Error fetching suppliers list:", error);
+    return catchError(res, error);
+  }
+}
+
+// ========================= Admin Simple List ============================
+export async function getAdminsSimpleList(req, res) {
+  try {
+    // Fetch only uuid and username for all admins
+    const admins = await Admin.findAll({
+      attributes: ["uuid", "username"],  // Select only the uuid and username fields
+      order: [["username", "ASC"]],      // Sort admins by username in ascending order
+      raw: true,                         // Return raw data (plain objects)
+    });
+
+    // Return success response with the data
+    return successOkWithData(
+      res,
+      "Admins list retrieved successfully.",
+      admins
+    );
+  } catch (error) {
+    console.error("Error fetching admins list:", error);
     return catchError(res, error);
   }
 }
@@ -266,7 +311,7 @@ export async function getSupplierDetail(req, res) {
     // Fetch phones associated with the supplier
     const phones = await Phone.findAll({
       where: { userUuid: uuid },
-      attributes: ["countryCode", "phone"],
+      attributes: ["uuid", "countryCode", "phone"],
     });
 
     // Attach phones to the supplier response
@@ -299,13 +344,20 @@ export async function updateSupplierDetail(req, res) {
     const supplier = await User.findByPk(uuid);
     if (!supplier) return frontError(res, "Invalid uuid.");
 
-    const { active, bonus, category } = req.body;
+    const { active, bonus, category, password } = req.body;
 
     let fieldsToUpdate = {};
 
     if (active !== undefined) fieldsToUpdate.active = active; // Check explicitly if active is not undefined (false should be valid)
     if (bonus) fieldsToUpdate.bonus = bonus;
+    if (password) {
+      // ✅ Validate Password Format
+      const invalidPassword = validatePassword(password);
+      if (invalidPassword) return validationError(res, invalidPassword);
 
+      const hashedPassword = await hashPassword(password);
+      fieldsToUpdate.password = hashedPassword;
+    }
     fieldsToUpdate.updatedBy = adminUid;
 
     if (category) {
@@ -352,6 +404,79 @@ export async function deleteSupplier(req, res) {
     return catchError(res, error);
   }
 }
+
+// ========================= Update Supplier Phone ============================
+
+export async function updateSupplierPhone(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const reqBodyFields = bodyReqFields(req, res, [
+      // "countryCode",
+      "phone",
+    ]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { uuid } = req.query; // phone uuid
+    const { countryCode, phone } = req.body;
+
+    const phoneRecord = await Phone.findByPk(uuid);
+    if (!phoneRecord) return frontError(res, "Invalid uuid.", "uuid");
+
+    // Check if no actual change
+    const isSame =
+      phoneRecord.phone === phone && phoneRecord.countryCode === countryCode;
+    if (isSame) {
+      return validationError(res, "New phone number cannot be the same as the current one.", "phone");
+    }
+
+    // Check if the new phone (with countryCode) already exists in other records
+    const duplicate = await Phone.findOne({
+      where: {
+        countryCode,
+        phone,
+        uuid: { [Op.ne]: uuid }, // Ignore the current record
+      },
+    });
+
+    if (duplicate) {
+      return frontError(res, "Phone number already exists.", "phone");
+    }
+
+    if (countryCode) phoneRecord.countryCode = countryCode;
+    if (phone) phoneRecord.phone = phone;
+
+    await phoneRecord.save();
+
+    return successOk(res, "Phone number updated successfully.");
+  } catch (error) {
+    console.log("===== error updating phone ===== :", error);
+    return catchError(res, error);
+  }
+}
+
+// ========================= Delete Supplier Phone ============================
+
+export async function deleteSupplierPhone(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const { uuid } = req.query; // phone uuid
+
+    const phoneRecord = await Phone.findByPk(uuid);
+    if (!phoneRecord) return frontError(res, "Invalid uuid.");
+
+    await phoneRecord.destroy();
+
+    return successOk(res, "Phone number deleted successfully.");
+  } catch (error) {
+    console.log("===== error deleting phone ===== :", error);
+    return catchError(res, error);
+  }
+}
+
 
 // // ========================= Approve Project ============================
 

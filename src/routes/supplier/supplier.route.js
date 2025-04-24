@@ -20,6 +20,13 @@ router.get(
   jobCtrl.getSuppliersSimpleList
 );
 
+router.get(
+  "/simple-list/admin",
+  verifyToken,
+  checkRole(["superadmin", "admin"]),
+  jobCtrl.getAdminsSimpleList
+);
+
 // router
 //     .route("/")
 //     .get(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.getSupplierDetail)
@@ -34,6 +41,11 @@ router
   .post(jobCtrl.addNewSupplier)
   .patch(jobCtrl.updateSupplierDetail)
   .delete(jobCtrl.deleteSupplier);
+
+router
+  .route("/phone")
+  .patch(jobCtrl.updateSupplierPhone)
+  .delete(jobCtrl.deleteSupplierPhone);
 
 // // ✅ Post Project (Employer)
 // router.post("/add", verifyToken, checkRole(["apprenticeship"]), jobCtrl.addProject);

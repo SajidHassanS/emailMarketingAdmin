@@ -21,6 +21,9 @@ const sequelize = new Sequelize(dbName, dbUser, dbPass, {
   logging: console.log, // Optional: shows SQL queries
 });
 
+// import { dbUrl } from "./initialConfig.js";
+// const sequelize = new Sequelize(dbUrl);
+
 export const connectDB = async () => {
   try {
     console.log(chalk.cyan("▶ Connecting to database with manual config..."));
@@ -30,6 +33,7 @@ export const connectDB = async () => {
 
     console.log(
       chalk.green.bold(`Connected to the database ${dbName} ${dbHost}`)
+      // chalk.green.bold(`Connected to the database`)
     );
     await sequelize.sync();
     console.log(chalk.green.bold("✅ Models synced successfully"));
