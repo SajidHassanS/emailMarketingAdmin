@@ -27,18 +27,37 @@ import Phone from "../../models/user/phone.model.js";
 
 // ========================= Helping Functions ============================
 
-const generateUserTitle = async (category, userUid, username) => {
-  // Find the user's registration position based on created_at
-  const userNumber = await User.count({
+// const generateUserTitle = async (category, userUid, username) => {
+//   // Find the user's registration position based on created_at
+//   const userNumber = await User.count({
+//     where: {
+//       createdAt: { [Op.lte]: (await User.findByPk(userUid)).createdAt },
+//     },
+//   });
+
+//   // Format userNumber as a 4-digit number
+//   const formattedNumber = String(userNumber).padStart(4, "0");
+
+//   // Construct the userTitle
+//   return `${category}${formattedNumber}_${username}`;
+// };
+
+const generateUserTitle = async (category, username) => {
+  // Count users with userTitle starting with the given category letter
+  const userCountWithCategory = await User.count({
     where: {
-      createdAt: { [Op.lte]: (await User.findByPk(userUid)).createdAt },
+      userTitle: {
+        [Op.startsWith]: category,
+      },
     },
   });
 
-  // Format userNumber as a 4-digit number
-  const formattedNumber = String(userNumber).padStart(4, "0");
+  // Add 1 to get the next user number
+  const newNumber = userCountWithCategory + 1;
 
-  // Construct the userTitle
+  // Format number as 4-digit
+  const formattedNumber = String(newNumber).padStart(4, "0");
+
   return `${category}${formattedNumber}_${username}`;
 };
 
@@ -56,10 +75,10 @@ export async function getSuppliersList(req, res) {
       createdFrom,
       createdTo,
       updatedFrom,
-      updatedTo
+      updatedTo,
     } = req.query;
 
-    console.log("===== req.query ===== : ", req.query)
+    console.log("===== req.query ===== : ", req.query);
 
     const where = {};
     if (active !== undefined) where.active = active === "true";
@@ -101,10 +120,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-        where: { uuid: createdByUuids },
-        attributes: ["uuid", "username"],
-        raw: true, // Convert to plain objects
-      })
+          where: { uuid: createdByUuids },
+          attributes: ["uuid", "username"],
+          raw: true, // Convert to plain objects
+        })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -194,9 +213,9 @@ export async function getAdminsSimpleList(req, res) {
   try {
     // Fetch only uuid and username for all admins
     const admins = await Admin.findAll({
-      attributes: ["uuid", "username"],  // Select only the uuid and username fields
-      order: [["username", "ASC"]],      // Sort admins by username in ascending order
-      raw: true,                         // Return raw data (plain objects)
+      attributes: ["uuid", "username"], // Select only the uuid and username fields
+      order: [["username", "ASC"]], // Sort admins by username in ascending order
+      raw: true, // Return raw data (plain objects)
     });
 
     // Return success response with the data
@@ -371,7 +390,7 @@ export async function updateSupplierDetail(req, res) {
 
       const userTitle = await generateUserTitle(
         category,
-        supplier.uuid,
+        // supplier.uuid,
         supplier.username
       );
       fieldsToUpdate.userTitle = userTitle;
@@ -428,7 +447,11 @@ export async function updateSupplierPhone(req, res) {
     const isSame =
       phoneRecord.phone === phone && phoneRecord.countryCode === countryCode;
     if (isSame) {
-      return validationError(res, "New phone number cannot be the same as the current one.", "phone");
+      return validationError(
+        res,
+        "New phone number cannot be the same as the current one.",
+        "phone"
+      );
     }
 
     // Check if the new phone (with countryCode) already exists in other records
@@ -476,7 +499,6 @@ export async function deleteSupplierPhone(req, res) {
     return catchError(res, error);
   }
 }
-
 
 // // ========================= Approve Project ============================
 
