@@ -251,12 +251,15 @@ export async function handleWithdrawal(req, res) {
         where: { userUuid: withdrawal.userUuid, status: "approved" },
       });
 
+      console.log("===== withdrawalCount ===== : ", withdrawalCount)
+
       if (withdrawalCount === 1) {
         // Unlock the user's signup bonus if this is their first approved withdrawal
         const bonus = await Bonus.findOne({
-          where: { userUuid: withdrawal.userUuid, type: "signup" },
+          where: { userUuid: withdrawal.userUuid, unlockedAfterFirstWithdrawal: false, },
         });
 
+        console.log("===== bonus ===== : ", bonus)
         if (bonus) {
           await bonus.update({ unlockedAfterFirstWithdrawal: true });
 
@@ -273,6 +276,7 @@ export async function handleWithdrawal(req, res) {
           const referrerBonus = await Bonus.findOne({
             where: { userUuid: bonus.refereeUuid, type: "referral" },
           });
+          console.log("===== referrerBonus ===== : ", referrerBonus)
 
           if (referrerBonus) {
             await referrerBonus.update({ unlockedAfterFirstWithdrawal: true });

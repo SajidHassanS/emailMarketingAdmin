@@ -36,7 +36,7 @@ const BonusWithdrawal = sequelize.define(
       references: { model: "WithdrawalMethod", key: "uuid" },
     },
     status: {
-      type: DataTypes.ENUM("pending", "approved", "withdrawn"),
+      type: DataTypes.ENUM("pending", "approved", "rejected"),
       defaultValue: "pending",
     },
   },
