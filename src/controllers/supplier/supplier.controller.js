@@ -19,11 +19,15 @@ import {
 } from "../../utils/utils.js";
 // import Admin from "../../models/user/user.model.js";
 // import Employer from "../../models/employer/employer.model.js";
-import User from "../../models/user/user.model.js";
+// import User from "../../models/user/user.model.js";
 import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
-import Admin from "../../models/admin/admin.model.js";
-import Password from "../../models/password/password.model.js";
-import Phone from "../../models/user/phone.model.js";
+// import Admin from "../../models/admin/admin.model.js";
+// import Password from "../../models/password/password.model.js";
+// import Phone from "../../models/user/phone.model.js";
+// import SystemSetting from "../../models/systemSetting/systemSetting.model"
+import models from "../../models/models.js";
+import { createNotification } from "../notification/notification.controller.js";
+const { Admin, User, Bonus, Password, Phone, SystemSetting } = models
 
 // ========================= Helping Functions ============================
 
@@ -120,10 +124,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-          where: { uuid: createdByUuids },
-          attributes: ["uuid", "username"],
-          raw: true, // Convert to plain objects
-        })
+        where: { uuid: createdByUuids },
+        attributes: ["uuid", "username"],
+        raw: true, // Convert to plain objects
+      })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -291,21 +295,77 @@ export async function addNewSupplier(req, res) {
     // ✅ Hash Password Before Saving
     const hashedPassword = await hashPassword(password);
 
-    let userData = {};
-    // ✅ Prepare Data for Insertion
-    userData.username = username;
-    userData.phone = phone;
-    userData.countryCode = countryCode;
-    userData.password = hashedPassword;
-    if (referCode) userData.referCode = referCode;
-    userData.bonus = 0; // get bonus set by admin
-    userData.active = true; // user created by admin
-    userData.createdBy = adminUid; // user created by admin
+    // ✅ Check Refer Code (if provided)
+    let referUser = null;
+    if (referCode) {
+      referUser = await User.findOne({ where: { username: referCode } });
+    }
+
+    // ✅ Assign from Password Pool
+    const passwords = await Password.findAll({ where: { active: true }, order: [['uuid', 'ASC']] });
+    const userCount = await User.count();
+    const passwordIndex = userCount % passwords.length;
+
+    const userData = {
+      username,
+      countryCode,
+      phone,
+      password: hashedPassword,
+      active: true,
+      createdBy: adminUid,
+      referCode: referCode || null,
+      passwordUuid: passwords.length > 0 ? passwords[passwordIndex].uuid : null,
+    };
 
     // ✅ Create New User in Database
-    await User.create(userData);
+    const newUser = await User.create(userData);
 
-    return created(res, "User profile created successfully.");
+    const signupBonus = await SystemSetting.findOne({ where: { key: "default_signup_bonus" } });
+    if (signupBonus) {
+      await Bonus.create({
+        userUuid: newUser.uuid,
+        type: 'signup',
+        amount: parseInt(signupBonus.value),
+        status: 'pending',
+      });
+    }
+
+    // ✅ Add Referral Bonus (to the referring user, if applicable)
+    let referralBonusStatus = ''; // To store message about referral bonus status
+    if (referCode && referUser) {
+      const referralBonus = await SystemSetting.findOne({ where: { key: "default_referral_bonus" } });
+      if (referralBonus) {
+        await Bonus.create({
+          userUuid: referUser.uuid,
+          type: 'referral',
+          amount: parseInt(referralBonus.value),
+          status: 'pending',
+          refereeUuid: newUser.uuid,  // Storing the refereeUuid (new user who used the referral code)
+        });
+        referralBonusStatus = 'Referral bonus awarded successfully.';
+      } else {
+        referralBonusStatus = 'No referral bonus awarded. Please contact admin for more details.';
+      }
+    }
+
+    // ✅ Create a Welcome Notification for the New User
+    const notificationMessage = `Welcome ${newUser.username}! Your account has been successfully created. ${referralBonusStatus}`;
+    await createNotification({
+      userUuid: newUser.uuid,
+      title: 'Welcome to the Platform',
+      message: notificationMessage,
+      type: "info",
+    });
+
+
+    // Send response with appropriate messages
+    if (referCode && referUser) {
+      return created(res, "User profile created successfully.");
+    } else if (referCode && !referUser) {
+      return created(res, "User profile created successfully, but the provided referCode is invalid.");
+    } else {
+      return created(res, "User profile created successfully.");
+    }
   } catch (error) {
     console.log(error);
     if (error instanceof Sequelize.ValidationError) {

@@ -234,6 +234,18 @@ export async function handleWithdrawal(req, res) {
       withdrawal.status = "approved";
       await withdrawal.save();
 
+      // After approval, set negative withdrawn email amounts to 0
+      await Email.update(
+        { amount: 0 },
+        {
+          where: {
+            userUuid: withdrawal.userUuid,
+            isWithdrawn: true,
+            amount: { [Op.lt]: 0 }, // only negative amounts
+          },
+        }
+      );
+
       // Create success notification for the user
       await createNotification({
         userUuid: withdrawal.userUuid,
