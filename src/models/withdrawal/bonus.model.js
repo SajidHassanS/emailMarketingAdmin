@@ -10,12 +10,12 @@ const Bonus = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    userUuid: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "Users", key: "uuid" },
-      onDelete: "CASCADE",
-    },
+    // userUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: { model: "Users", key: "uuid" },
+    //   onDelete: "CASCADE",
+    // },
     type: {
       type: DataTypes.ENUM("signup", "referral"),
       allowNull: false,
@@ -28,14 +28,14 @@ const Bonus = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-    refereeUuid: {
-      type: DataTypes.UUID,
-      allowNull: true,
-      references: {
-        model: User,
-        key: "uuid",
-      },
-    },
+    // refereeUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: true,
+    //   references: {
+    //     model: User,
+    //     key: "uuid",
+    //   },
+    // },
   },
   {
     schema: "public",
