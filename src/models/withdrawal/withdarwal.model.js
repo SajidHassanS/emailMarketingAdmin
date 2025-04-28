@@ -11,17 +11,17 @@ const Withdrawal = sequelize.define(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    userUuid: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "User", key: "uuid" },
-    },
-    withdrawalMethodUuid: {
-      // Reference to WithdrawalMethod
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "WithdrawalMethod", key: "uuid" },
-    },
+    // userUuid: {
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: { model: "User", key: "uuid" },
+    // },
+    // withdrawalMethodUuid: {
+    //   // Reference to WithdrawalMethod
+    //   type: DataTypes.UUID,
+    //   allowNull: false,
+    //   references: { model: "WithdrawalMethod", key: "uuid" },
+    // },
     amount: {
       type: DataTypes.INTEGER,
       allowNull: false,
