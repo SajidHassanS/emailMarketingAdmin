@@ -114,7 +114,9 @@ export async function loginAdmin(req, res) {
     const reqBodyFields = bodyReqFields(req, res, ["username", "password"]);
     if (reqBodyFields.error) return reqBodyFields.response;
 
-    const { username, password } = req.body;
+    const excludedFields = ['password'];
+    const requiredData = convertToLowercase(req.body, excludedFields);
+    let { username, password } = requiredData;
 
     // Check if a admin with the given username not exists
     const admin = await Admin.findOne({ where: { username } });

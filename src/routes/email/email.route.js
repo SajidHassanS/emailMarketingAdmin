@@ -16,7 +16,8 @@ router.route("/bulk-insert").post(verifyToken, emailCtrl.bulkEmailEntry); // Bul
 
 router
   .route("/bulk-update")
-  .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByUuids); // Bulk update email's status
+  // .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByUuids); // Bulk update email's status // old api
+  .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByEmails); // Bulk update email's status
 
 router.route("/stats").get(verifyToken, emailCtrl.getEmailStats); // Email stats
 

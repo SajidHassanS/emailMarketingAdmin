@@ -19,26 +19,49 @@ import {
 } from "../../utils/utils.js";
 // import Admin from "../../models/user/user.model.js";
 // import Employer from "../../models/employer/employer.model.js";
-import User from "../../models/user/user.model.js";
+// import User from "../../models/user/user.model.js";
 import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
-import Admin from "../../models/admin/admin.model.js";
-import Password from "../../models/password/password.model.js";
-import Phone from "../../models/user/phone.model.js";
+// import Admin from "../../models/admin/admin.model.js";
+// import Password from "../../models/password/password.model.js";
+// import Phone from "../../models/user/phone.model.js";
+// import SystemSetting from "../../models/systemSetting/systemSetting.model"
+import models from "../../models/models.js";
+import { createNotification } from "../notification/notification.controller.js";
+const { Admin, User, Bonus, Password, Phone, SystemSetting } = models
 
 // ========================= Helping Functions ============================
 
-const generateUserTitle = async (category, userUid, username) => {
-  // Find the user's registration position based on created_at
-  const userNumber = await User.count({
+// const generateUserTitle = async (category, userUid, username) => {
+//   // Find the user's registration position based on created_at
+//   const userNumber = await User.count({
+//     where: {
+//       createdAt: { [Op.lte]: (await User.findByPk(userUid)).createdAt },
+//     },
+//   });
+
+//   // Format userNumber as a 4-digit number
+//   const formattedNumber = String(userNumber).padStart(4, "0");
+
+//   // Construct the userTitle
+//   return `${category}${formattedNumber}_${username}`;
+// };
+
+const generateUserTitle = async (category, username) => {
+  // Count users with userTitle starting with the given category letter
+  const userCountWithCategory = await User.count({
     where: {
-      createdAt: { [Op.lte]: (await User.findByPk(userUid)).createdAt },
+      userTitle: {
+        [Op.startsWith]: category,
+      },
     },
   });
 
-  // Format userNumber as a 4-digit number
-  const formattedNumber = String(userNumber).padStart(4, "0");
+  // Add 1 to get the next user number
+  const newNumber = userCountWithCategory + 1;
 
-  // Construct the userTitle
+  // Format number as 4-digit
+  const formattedNumber = String(newNumber).padStart(4, "0");
+
   return `${category}${formattedNumber}_${username}`;
 };
 
@@ -46,16 +69,39 @@ const generateUserTitle = async (category, userUid, username) => {
 
 export async function getSuppliersList(req, res) {
   try {
-    const { status, district, trade, sector, duration, deadline } = req.query;
+    const {
+      active,
+      username,
+      countryCode,
+      phone,
+      userTitle,
+      createdByUuid,
+      createdFrom,
+      createdTo,
+      updatedFrom,
+      updatedTo,
+    } = req.query;
+
+    console.log("===== req.query ===== : ", req.query);
 
     const where = {};
-    // where.active = true;
-    // if (status) where.status = status;
-    // // ✅ Define filters for associated project details
-    // if (district) where.district = district;
-    // if (trade) where.trade = trade;
-    // if (sector) where.sector = sector;
-    // if (duration) where.duration = duration;
+    if (active !== undefined) where.active = active === "true";
+    if (username) where.username = { [Op.iLike]: `%${username}%` };
+    if (countryCode) where.countryCode = countryCode;
+    if (phone) where.phone = { [Op.iLike]: `%${phone}%` };
+    if (userTitle) where.userTitle = { [Op.iLike]: `%${userTitle}%` };
+    if (createdByUuid) where.createdBy = createdByUuid;
+    if (createdFrom || createdTo) {
+      where.createdAt = {};
+      if (createdFrom) where.createdAt[Op.gte] = new Date(createdFrom);
+      if (createdTo) where.createdAt[Op.lte] = new Date(createdTo);
+    }
+
+    if (updatedFrom || updatedTo) {
+      where.updatedAt = {};
+      if (updatedFrom) where.updatedAt[Op.gte] = new Date(updatedFrom);
+      if (updatedTo) where.updatedAt[Op.lte] = new Date(updatedTo);
+    }
 
     // ✅ Filter by project deadline (applications where project deadline is <= given date)
     // if (deadline) where.deadline = { [Op.lte]: deadline };
@@ -78,10 +124,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-          where: { uuid: createdByUuids },
-          attributes: ["uuid", "username"],
-          raw: true, // Convert to plain objects
-        })
+        where: { uuid: createdByUuids },
+        attributes: ["uuid", "username"],
+        raw: true, // Convert to plain objects
+      })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -166,6 +212,28 @@ export async function getSuppliersSimpleList(req, res) {
   }
 }
 
+// ========================= Admin Simple List ============================
+export async function getAdminsSimpleList(req, res) {
+  try {
+    // Fetch only uuid and username for all admins
+    const admins = await Admin.findAll({
+      attributes: ["uuid", "username"], // Select only the uuid and username fields
+      order: [["username", "ASC"]], // Sort admins by username in ascending order
+      raw: true, // Return raw data (plain objects)
+    });
+
+    // Return success response with the data
+    return successOkWithData(
+      res,
+      "Admins list retrieved successfully.",
+      admins
+    );
+  } catch (error) {
+    console.error("Error fetching admins list:", error);
+    return catchError(res, error);
+  }
+}
+
 // ========================= Add New Supplier ============================
 export async function addNewSupplier(req, res) {
   try {
@@ -227,21 +295,77 @@ export async function addNewSupplier(req, res) {
     // ✅ Hash Password Before Saving
     const hashedPassword = await hashPassword(password);
 
-    let userData = {};
-    // ✅ Prepare Data for Insertion
-    userData.username = username;
-    userData.phone = phone;
-    userData.countryCode = countryCode;
-    userData.password = hashedPassword;
-    if (referCode) userData.referCode = referCode;
-    userData.bonus = 0; // get bonus set by admin
-    userData.active = true; // user created by admin
-    userData.createdBy = adminUid; // user created by admin
+    // ✅ Check Refer Code (if provided)
+    let referUser = null;
+    if (referCode) {
+      referUser = await User.findOne({ where: { username: referCode } });
+    }
+
+    // ✅ Assign from Password Pool
+    const passwords = await Password.findAll({ where: { active: true }, order: [['uuid', 'ASC']] });
+    const userCount = await User.count();
+    const passwordIndex = userCount % passwords.length;
+
+    const userData = {
+      username,
+      countryCode,
+      phone,
+      password: hashedPassword,
+      active: true,
+      createdBy: adminUid,
+      referCode: referCode || null,
+      passwordUuid: passwords.length > 0 ? passwords[passwordIndex].uuid : null,
+    };
 
     // ✅ Create New User in Database
-    await User.create(userData);
+    const newUser = await User.create(userData);
 
-    return created(res, "User profile created successfully.");
+    const signupBonus = await SystemSetting.findOne({ where: { key: "default_signup_bonus" } });
+    if (signupBonus) {
+      await Bonus.create({
+        userUuid: newUser.uuid,
+        type: 'signup',
+        amount: parseInt(signupBonus.value),
+        status: 'pending',
+      });
+    }
+
+    // ✅ Add Referral Bonus (to the referring user, if applicable)
+    let referralBonusStatus = ''; // To store message about referral bonus status
+    if (referCode && referUser) {
+      const referralBonus = await SystemSetting.findOne({ where: { key: "default_referral_bonus" } });
+      if (referralBonus) {
+        await Bonus.create({
+          userUuid: referUser.uuid,
+          type: 'referral',
+          amount: parseInt(referralBonus.value),
+          status: 'pending',
+          refereeUuid: newUser.uuid,  // Storing the refereeUuid (new user who used the referral code)
+        });
+        referralBonusStatus = 'Referral bonus awarded successfully.';
+      } else {
+        referralBonusStatus = 'No referral bonus awarded. Please contact admin for more details.';
+      }
+    }
+
+    // ✅ Create a Welcome Notification for the New User
+    const notificationMessage = `Welcome ${newUser.username}! Your account has been successfully created. ${referralBonusStatus}`;
+    await createNotification({
+      userUuid: newUser.uuid,
+      title: 'Welcome to the Platform',
+      message: notificationMessage,
+      type: "info",
+    });
+
+
+    // Send response with appropriate messages
+    if (referCode && referUser) {
+      return created(res, "User profile created successfully.");
+    } else if (referCode && !referUser) {
+      return created(res, "User profile created successfully, but the provided referCode is invalid.");
+    } else {
+      return created(res, "User profile created successfully.");
+    }
   } catch (error) {
     console.log(error);
     if (error instanceof Sequelize.ValidationError) {
@@ -266,7 +390,7 @@ export async function getSupplierDetail(req, res) {
     // Fetch phones associated with the supplier
     const phones = await Phone.findAll({
       where: { userUuid: uuid },
-      attributes: ["countryCode", "phone"],
+      attributes: ["uuid", "countryCode", "phone"],
     });
 
     // Attach phones to the supplier response
@@ -299,13 +423,20 @@ export async function updateSupplierDetail(req, res) {
     const supplier = await User.findByPk(uuid);
     if (!supplier) return frontError(res, "Invalid uuid.");
 
-    const { active, bonus, category } = req.body;
+    const { active, bonus, category, password } = req.body;
 
     let fieldsToUpdate = {};
 
     if (active !== undefined) fieldsToUpdate.active = active; // Check explicitly if active is not undefined (false should be valid)
     if (bonus) fieldsToUpdate.bonus = bonus;
+    if (password) {
+      // ✅ Validate Password Format
+      const invalidPassword = validatePassword(password);
+      if (invalidPassword) return validationError(res, invalidPassword);
 
+      const hashedPassword = await hashPassword(password);
+      fieldsToUpdate.password = hashedPassword;
+    }
     fieldsToUpdate.updatedBy = adminUid;
 
     if (category) {
@@ -319,7 +450,7 @@ export async function updateSupplierDetail(req, res) {
 
       const userTitle = await generateUserTitle(
         category,
-        supplier.uuid,
+        // supplier.uuid,
         supplier.username
       );
       fieldsToUpdate.userTitle = userTitle;
@@ -349,6 +480,82 @@ export async function deleteSupplier(req, res) {
     await supplier.destroy();
     return successOkWithData(res, "Supplier deleted successfully.");
   } catch (error) {
+    return catchError(res, error);
+  }
+}
+
+// ========================= Update Supplier Phone ============================
+
+export async function updateSupplierPhone(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const reqBodyFields = bodyReqFields(req, res, [
+      // "countryCode",
+      "phone",
+    ]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { uuid } = req.query; // phone uuid
+    const { countryCode, phone } = req.body;
+
+    const phoneRecord = await Phone.findByPk(uuid);
+    if (!phoneRecord) return frontError(res, "Invalid uuid.", "uuid");
+
+    // Check if no actual change
+    const isSame =
+      phoneRecord.phone === phone && phoneRecord.countryCode === countryCode;
+    if (isSame) {
+      return validationError(
+        res,
+        "New phone number cannot be the same as the current one.",
+        "phone"
+      );
+    }
+
+    // Check if the new phone (with countryCode) already exists in other records
+    const duplicate = await Phone.findOne({
+      where: {
+        countryCode,
+        phone,
+        uuid: { [Op.ne]: uuid }, // Ignore the current record
+      },
+    });
+
+    if (duplicate) {
+      return frontError(res, "Phone number already exists.", "phone");
+    }
+
+    if (countryCode) phoneRecord.countryCode = countryCode;
+    if (phone) phoneRecord.phone = phone;
+
+    await phoneRecord.save();
+
+    return successOk(res, "Phone number updated successfully.");
+  } catch (error) {
+    console.log("===== error updating phone ===== :", error);
+    return catchError(res, error);
+  }
+}
+
+// ========================= Delete Supplier Phone ============================
+
+export async function deleteSupplierPhone(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const { uuid } = req.query; // phone uuid
+
+    const phoneRecord = await Phone.findByPk(uuid);
+    if (!phoneRecord) return frontError(res, "Invalid uuid.");
+
+    await phoneRecord.destroy();
+
+    return successOk(res, "Phone number deleted successfully.");
+  } catch (error) {
+    console.log("===== error deleting phone ===== :", error);
     return catchError(res, error);
   }
 }

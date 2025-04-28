@@ -234,6 +234,18 @@ export async function handleWithdrawal(req, res) {
       withdrawal.status = "approved";
       await withdrawal.save();
 
+      // After approval, set negative withdrawn email amounts to 0
+      await Email.update(
+        { amount: 0 },
+        {
+          where: {
+            userUuid: withdrawal.userUuid,
+            isWithdrawn: true,
+            amount: { [Op.lt]: 0 }, // only negative amounts
+          },
+        }
+      );
+
       // Create success notification for the user
       await createNotification({
         userUuid: withdrawal.userUuid,
@@ -251,12 +263,15 @@ export async function handleWithdrawal(req, res) {
         where: { userUuid: withdrawal.userUuid, status: "approved" },
       });
 
+      console.log("===== withdrawalCount ===== : ", withdrawalCount)
+
       if (withdrawalCount === 1) {
         // Unlock the user's signup bonus if this is their first approved withdrawal
         const bonus = await Bonus.findOne({
-          where: { userUuid: withdrawal.userUuid, type: "signup" },
+          where: { userUuid: withdrawal.userUuid, unlockedAfterFirstWithdrawal: false, },
         });
 
+        console.log("===== bonus ===== : ", bonus)
         if (bonus) {
           await bonus.update({ unlockedAfterFirstWithdrawal: true });
 
@@ -273,6 +288,7 @@ export async function handleWithdrawal(req, res) {
           const referrerBonus = await Bonus.findOne({
             where: { userUuid: bonus.refereeUuid, type: "referral" },
           });
+          console.log("===== referrerBonus ===== : ", referrerBonus)
 
           if (referrerBonus) {
             await referrerBonus.update({ unlockedAfterFirstWithdrawal: true });

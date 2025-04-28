@@ -111,10 +111,110 @@ export async function getAllEmails(req, res) {
 
 // ========================= Update Email Status ============================
 
+// export async function updateEmailStatus(req, res) {
+//   try {
+//     const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+//     if (reqQueryFields.error) return reqQueryFields.response;
+
+//     const reqBodyFields = bodyReqFields(req, res, ["status"]);
+//     if (reqBodyFields.error) return reqBodyFields.response;
+
+//     const { uuid } = req.query;
+//     const { status, remarks = null } = req.body;
+
+//     // Ensure valid status
+//     const allowedStatuses = ["good", "bad", "pending"];
+//     if (!allowedStatuses.includes(status)) {
+//       return frontError(
+//         res,
+//         "Invalid status. Allowed values are: good, bad, pending"
+//       );
+//     }
+
+//     // Find email record
+//     const email = await Email.findOne({ where: { uuid } });
+//     if (!email) return frontError(res, "Invalid email UUID");
+
+//     // let amount = 0;
+
+//     // // If email is marked as good, assign reward
+//     // if (status === "good") {
+//     //   const defaultReward = await SystemSetting.findOne({
+//     //     where: { key: "default_email_reward" },
+//     //   });
+
+//     //   amount = defaultReward ? parseInt(defaultReward.value) : 20;
+//     // }
+
+//     // // Update values
+//     // await Email.update({ status, remarks, amount }, { where: { uuid } });
+
+//     // // Send Notification
+//     // await createNotification({
+//     //   userUuid: email.userUuid,
+//     //   title: "Email Status Updated",
+//     //   message: `The status of your email (${email.email}) has been changed to "${status}".`,
+//     //   type: "info",
+//     //   // metadata: {
+//     //   //   emailUuid: email.uuid,
+//     //   //   newStatus: status,
+//     //   //   remarks,
+//     //   // },
+//     // });
+
+//     // return successOk(res, "Email status updated successfully");
+
+//     const previousStatus = email.status;
+//     let amount = email.amount;
+
+//     // Early return if no status change
+//     if (previousStatus === status) {
+//       return successOk(res, `Status is already '${status}'. No update needed.`);
+//     }
+
+//     // Fetch reward value
+//     const rewardSetting = await SystemSetting.findOne({
+//       where: { key: "default_email_reward" },
+//     });
+//     const reward = rewardSetting ? parseInt(rewardSetting.value) : 20;
+
+//     const toGood = ["pending", "bad"].includes(previousStatus) && status === "good";
+//     const toBadFromPending = previousStatus === "pending" && status === "bad";
+//     const fromGoodToOther = previousStatus === "good" && ["bad", "pending"].includes(status);
+
+//     if (toGood) {
+//       amount = reward;
+//     } else if (toBadFromPending) {
+//       return successOk(res, "Email status updated successfully.");
+//     } else if (fromGoodToOther) {
+//       amount = email.isWithdrawn ? -reward : 0;
+//     }
+
+//     console.log("===== previousStatus ===== :", previousStatus)
+//     console.log("===== status ===== :", status)
+//     console.log("===== amount ===== :", amount)
+
+//     // Update email record
+//     await Email.update({ status, remarks, amount }, { where: { uuid } });
+
+//     // Send Notification
+//     await createNotification({
+//       userUuid: email.userUuid,
+//       title: "Email Status Updated",
+//       message: `The status of your email (${email.email}) has been changed to "${status}".`,
+//       type: "info",
+//     });
+
+//     return successOk(res, "Email status updated successfully");
+//   } catch (error) {
+//     console.log("===== Error ===== : ", error);
+
+//     return catchError(res, error);
+//   }
+// }
+
 export async function updateEmailStatus(req, res) {
   try {
-    // const userUid = req.userUid;
-
     const reqQueryFields = queryReqFields(req, res, ["uuid"]);
     if (reqQueryFields.error) return reqQueryFields.response;
 
@@ -124,7 +224,6 @@ export async function updateEmailStatus(req, res) {
     const { uuid } = req.query;
     const { status, remarks = null } = req.body;
 
-    // Ensure valid status
     const allowedStatuses = ["good", "bad", "pending"];
     if (!allowedStatuses.includes(status)) {
       return frontError(
@@ -133,44 +232,63 @@ export async function updateEmailStatus(req, res) {
       );
     }
 
-    // Find email record
     const email = await Email.findOne({ where: { uuid } });
     if (!email) return frontError(res, "Invalid email UUID");
 
-    let amount = 0;
+    const previousStatus = email.status;
+    const isWithdrawn = email.isWithdrawn;
+    let amount = email.amount;
 
-    // If email is marked as good, assign reward
-    if (status === "good") {
-      const defaultReward = await SystemSetting.findOne({
-        where: { key: "default_email_reward" },
-      });
-
-      amount = defaultReward ? parseInt(defaultReward.value) : 20;
+    // Early return if no status change
+    if (previousStatus === status) {
+      return successOk(res, `Status is already '${status}'. No update needed.`);
     }
 
-    // Update values
+    // 🛑 NEW Critical Check: Withdrawn emails can only be marked 'bad'
+    if (isWithdrawn) {
+      if (status !== "bad") {
+        return frontError(res, "Withdrawn email can only be marked as 'bad'.");
+      }
+    }
+
+    const rewardSetting = await SystemSetting.findOne({
+      where: { key: "default_email_reward" },
+    });
+    const reward = rewardSetting ? parseInt(rewardSetting.value) : 20;
+
+    // Different scenarios
+    const goingToGood = ["pending", "bad"].includes(previousStatus) && status === "good";
+    const goingToBadOrPendingFromGood = previousStatus === "good" && ["bad", "pending"].includes(status);
+    const switchingBetweenPendingBad = (previousStatus === "pending" && status === "bad") ||
+      (previousStatus === "bad" && status === "pending");
+
+    if (goingToGood) {
+      amount = reward;
+    } else if (goingToBadOrPendingFromGood) {
+      amount = isWithdrawn ? -reward : 0;
+    } else if (switchingBetweenPendingBad) {
+      // pending <-> bad: no reward, no penalty
+      amount = 0;
+    }
+
+    // Update the email
     await Email.update({ status, remarks, amount }, { where: { uuid } });
 
-    // Send Notification
+    // Create notification
     await createNotification({
       userUuid: email.userUuid,
       title: "Email Status Updated",
       message: `The status of your email (${email.email}) has been changed to "${status}".`,
       type: "info",
-      // metadata: {
-      //   emailUuid: email.uuid,
-      //   newStatus: status,
-      //   remarks,
-      // },
     });
 
     return successOk(res, "Email status updated successfully");
   } catch (error) {
     console.log("===== Error ===== : ", error);
-
     return catchError(res, error);
   }
 }
+
 
 // ===================== Bulk Update Email Status ===========================
 
@@ -188,6 +306,14 @@ export async function bulkEmailEntry(req, res) {
 
     // const { uuid } = req.query;
     const { userUuid, emails, status, remarks } = req.body;
+
+    const allowedStatuses = ["good", "bad", "pending"];
+    if (!allowedStatuses.includes(status)) {
+      return frontError(
+        res,
+        "Invalid status. Allowed values are: good, bad, pending"
+      );
+    }
 
     // Parse emails from string: comma or newline separated
     const emailList = emails
@@ -327,16 +453,81 @@ export async function bulkEmailEntry(req, res) {
 
 // ===================== Bulk Update Email Status ===========================
 
-export async function bulkUpdateEmailStatusByUuids(req, res) {
+// dont remove this api.
+// export async function bulkUpdateEmailStatusByUuids(req, res) {
+//   try {
+//     const reqBodyFields = bodyReqFields(req, res, ["uuids", "status"]);
+//     if (reqBodyFields.error) return reqBodyFields.response;
+
+//     const { uuids, status, remarks = null } = req.body;
+
+//     if (!Array.isArray(uuids) || uuids.length === 0) {
+//       return frontError(res, "'uuids' must be a non-empty array.");
+//     }
+
+//     const allowedStatuses = ["good", "bad", "pending"];
+//     if (!allowedStatuses.includes(status)) {
+//       return frontError(
+//         res,
+//         "Invalid status. Allowed values are: good, bad, pending"
+//       );
+//     }
+
+//     // Fetch all emails with userUuid and email for notification
+//     const emails = await Email.findAll({
+//       where: { uuid: uuids },
+//       attributes: ["uuid", "email", "userUuid"],
+//     });
+
+//     const foundUuids = emails.map((e) => e.uuid);
+//     const invalidUuids = uuids.filter((id) => !foundUuids.includes(id));
+
+//     if (invalidUuids.length) {
+//       return frontError(res, `Invalid UUID(s): ${invalidUuids.join(", ")}`);
+//     }
+
+//     // Fetch reward only once
+//     let rewardAmount = 0;
+//     if (status === "good") {
+//       const defaultReward = await SystemSetting.findOne({
+//         where: { key: "default_email_reward" },
+//       });
+//       rewardAmount = defaultReward ? parseInt(defaultReward.value) : 20;
+//     }
+
+//     // Update each email individually with reward/amount
+//     for (const email of emails) {
+//       await Email.update(
+//         {
+//           status,
+//           remarks,
+//           amount: status === "good" ? rewardAmount : 0,
+//         },
+//         { where: { uuid: email.uuid } }
+//       );
+
+//       // Send Notification
+//       await createNotification({
+//         userUuid: email.userUuid,
+//         title: "Email Status Updated",
+//         message: `The status of your email (${email.email}) has been updated to "${status}".`,
+//         type: "info",
+//       });
+//     }
+
+//     return successOk(res, "Email statuses updated successfully");
+//   } catch (error) {
+//     console.log("===== Error ===== : ", error);
+//     return catchError(res, error);
+//   }
+// }
+
+export async function bulkUpdateEmailStatusByEmails(req, res) {
   try {
-    const reqBodyFields = bodyReqFields(req, res, ["uuids", "status"]);
+    const reqBodyFields = bodyReqFields(req, res, ["emails", "status"]);
     if (reqBodyFields.error) return reqBodyFields.response;
 
-    const { uuids, status, remarks = null } = req.body;
-
-    if (!Array.isArray(uuids) || uuids.length === 0) {
-      return frontError(res, "'uuids' must be a non-empty array.");
-    }
+    let { emails, status, remarks = null } = req.body;
 
     const allowedStatuses = ["good", "bad", "pending"];
     if (!allowedStatuses.includes(status)) {
@@ -346,20 +537,32 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
       );
     }
 
-    // Fetch all emails with userUuid and email for notification
-    const emails = await Email.findAll({
-      where: { uuid: uuids },
+    // Parse emails: allow comma or pipe separated input
+    const emailList = emails
+      .split(/[\n,]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.length > 0);
+
+    if (emailList.length === 0) {
+      return validationError(res, "No valid emails provided.");
+    }
+
+    // Get existing emails
+    const existingEmails = await Email.findAll({
+      where: { email: emailList },
       attributes: ["uuid", "email", "userUuid"],
     });
 
-    const foundUuids = emails.map((e) => e.uuid);
-    const invalidUuids = uuids.filter((id) => !foundUuids.includes(id));
+    const foundEmails = existingEmails.map((e) => e.email);
+    const missingEmails = emailList.filter(
+      (email) => !foundEmails.includes(email)
+    );
 
-    if (invalidUuids.length) {
-      return frontError(res, `Invalid UUID(s): ${invalidUuids.join(", ")}`);
+    if (foundEmails.length === 0) {
+      return frontError(res, "None of the provided emails exist.");
     }
 
-    // Fetch reward only once
+    // Fetch reward once
     let rewardAmount = 0;
     if (status === "good") {
       const defaultReward = await SystemSetting.findOne({
@@ -368,8 +571,7 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
       rewardAmount = defaultReward ? parseInt(defaultReward.value) : 20;
     }
 
-    // Update each email individually with reward/amount
-    for (const email of emails) {
+    for (const email of existingEmails) {
       await Email.update(
         {
           status,
@@ -379,7 +581,7 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
         { where: { uuid: email.uuid } }
       );
 
-      // Send Notification
+      // Notify the user
       await createNotification({
         userUuid: email.userUuid,
         title: "Email Status Updated",
@@ -388,12 +590,18 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
       });
     }
 
-    return successOk(res, "Email statuses updated successfully");
+    let message = `${foundEmails.length} email(s) updated successfully.`;
+    if (missingEmails.length > 0) {
+      message += ` ${missingEmails.length} email(s) not found: ${missingEmails.join(", ")}`;
+    }
+
+    return successOk(res, message);
   } catch (error) {
-    console.log("===== Error ===== : ", error);
+    console.log("===== Error ===== :", error);
     return catchError(res, error);
   }
 }
+
 
 // ======================== Get Email Stats =================================
 
