@@ -22,6 +22,10 @@ const Withdrawal = sequelize.define(
       allowNull: false,
       references: { model: "WithdrawalMethod", key: "uuid" },
     },
+    withdrawalType: {
+      type: DataTypes.ENUM('email', 'signup-bonus', 'referral-bonus'),
+      allowNull: false,
+    },
     amount: {
       type: DataTypes.INTEGER,
       allowNull: false,

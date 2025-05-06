@@ -13,7 +13,7 @@ export async function getAllWithdrawals(req, res) {
   try {
     const { status, startDate, endDate, search } = req.query;
 
-    const whereConditions = {};
+    const whereConditions = { withdrawalType: "email" };
     const userConditions = {};
 
     // 1. Status filter
@@ -260,7 +260,7 @@ export async function handleWithdrawal(req, res) {
 
       // Handle first approved withdrawal and bonus unlocking logic
       const withdrawalCount = await Withdrawal.count({
-        where: { userUuid: withdrawal.userUuid, status: "approved" },
+        where: { userUuid: withdrawal.userUuid, withdrawalType: "email", status: "approved" },
       });
 
       console.log("===== withdrawalCount ===== : ", withdrawalCount)
@@ -557,78 +557,236 @@ export async function getwithdrawalStats(req, res) {
   }
 }
 
+// export async function getAllBonusWithdrawals(req, res) {
+//   try {
+//     const { status, startDate, endDate, search } = req.query;
+
+//     const whereConditions = {};
+//     const userConditions = {};
+
+//     // 1. Status filter
+//     if (status && ["pending", "approved", "rejected"].includes(status)) {
+//       whereConditions.status = status;
+//     }
+
+//     // 2. Date range filter
+//     if (startDate || endDate) {
+//       whereConditions.createdAt = {};
+//       if (startDate) {
+//         // Convert startDate to Date and reset time to midnight (start of day)
+//         const start = new Date(startDate);
+//         start.setHours(0, 0, 0, 0);  // Reset time to 00:00:00
+//         whereConditions.createdAt[Op.gte] = start;
+//       }
+
+//       if (endDate) {
+//         // Convert endDate to Date and reset time to 23:59:59
+//         const end = new Date(endDate);
+//         end.setHours(23, 59, 59, 999);  // Set time to 23:59:59
+//         whereConditions.createdAt[Op.lte] = end;
+//       }
+//     }
+
+//     // 3. User search filter
+//     if (search) {
+//       userConditions[Op.or] = [
+//         { username: { [Op.iLike]: `%${search}%` } },
+//         { phone: { [Op.iLike]: `%${search}%` } },
+//       ];
+//     }
+
+//     const bonuswithdrawals = await BonusWithdrawal.findAll({
+//       where: whereConditions,
+//       include: [
+//         {
+//           model: Bonus, // Assuming you're including Bonus details
+//           as: 'bonus',
+//           attributes: ['uuid', 'amount', 'type'], // Adjust attributes as per need
+//         },
+//         {
+//           model: User,
+//           as: "user",
+//           attributes: ["username", "countryCode", "phone", "userTitle"],
+//           where: Object.keys(userConditions).length ? userConditions : undefined,
+//         },
+//         {
+//           model: WithdrawalMethod,
+//           as: "withdrawalMethod",
+//         },
+//       ],
+//       order: [["createdAt", "DESC"]],
+//     });
+
+//     if (!bonuswithdrawals.length)
+//       return notFound(res, "No bonus withdrawals found.");
+
+//     return successOkWithData(res, "Bonus withdrawals fetched successfully.", bonuswithdrawals);
+//   } catch (error) {
+//     console.error("Error fetching all bonus withdrawals:", error);
+//     return catchError(res, error);
+//   }
+// }
+
+
+// // Admin API to approve or reject bonus withdrawal requests
+// export async function approveRejectBonusWithdrawal(req, res) {
+//   const reqBodyFields = bodyReqFields(req, res, ["withdrawalUuid", "action"]);
+//   if (reqBodyFields.error) return reqBodyFields.response;
+
+//   const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
+
+//   // Validate action type
+//   if (!['approve', 'reject'].includes(action)) {
+//     return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
+//   }
+
+//   try {
+//     // ✅ Fetch the withdrawal request by UUID
+//     const withdrawalRequest = await BonusWithdrawal.findOne({
+//       where: {
+//         uuid: withdrawalUuid,
+//       },
+//     });
+
+//     if (!withdrawalRequest) {
+//       return validationError(res, "No withdrawal request found with the provided UUID.");
+//     }
+
+//     // ✅ Fetch the associated bonus for this withdrawal request
+//     const bonus = await Bonus.findOne({
+//       where: {
+//         uuid: withdrawalRequest.bonusUuid,
+//       },
+//     });
+
+//     if (!bonus) {
+//       return validationError(res, "The associated bonus for this withdrawal request is not found.");
+//     }
+
+//     // ✅ If the action is to approve, update the withdrawal request status
+//     if (action === 'approve') {
+//       withdrawalRequest.status = 'approved';
+//       await withdrawalRequest.save();
+
+//       // ✅ Notify the user about the successful approval
+//       await createNotification({
+//         userUuid: bonus.userUuid,
+//         title: "Bonus Withdrawal Approved",
+//         message: `Your ${bonus.type} bonus withdrawal request has been approved.`,
+//         type: "success",
+//       });
+
+//       return successOkWithData(res, "Bonus withdrawal request approved successfully.");
+//     }
+
+//     // ✅ If the action is to reject, update the withdrawal request status to rejected
+//     if (action === 'reject') {
+//       withdrawalRequest.status = 'rejected';
+
+//       // ✅ Save the rejected status to the database
+//       await withdrawalRequest.save();
+
+//       // ✅ Notify the user about the rejection
+//       await createNotification({
+//         userUuid: bonus.userUuid,
+//         title: "Bonus Withdrawal Rejected",
+//         message: `Your ${bonus.type} bonus withdrawal request has been rejected.`,
+//         type: "error",
+//       });
+
+//       return successOkWithData(res, "Bonus withdrawal request rejected successfully.");
+//     }
+//   } catch (error) {
+//     console.error("Error processing bonus withdrawal approval/rejection:", error);
+//     return frontError(res, "Something went wrong. Please try again later.");
+//   }
+// }
+
+// Admin API to approve or reject bonus withdrawal requests
+
 export async function getAllBonusWithdrawals(req, res) {
   try {
     const { status, startDate, endDate, search } = req.query;
 
-    const whereConditions = {};
-    const userConditions = {};
+    // 1) Base filter: only bonus withdrawals
+    const where = {
+      withdrawalType: { [Op.in]: ["signup-bonus", "referral-bonus"] },
+    };
 
-    // 1. Status filter
-    if (status && ["pending", "approved", "rejected"].includes(status)) {
-      whereConditions.status = status;
+    // 2) status filter (single or comma-separated)
+    if (status) {
+      const statuses = status.split(",").map((s) => s.trim());
+      const validStatuses = ["pending", "approved", "rejected"];
+      if (statuses.some((s) => !validStatuses.includes(s))) {
+        return frontError(
+          res,
+          400,
+          `Invalid status. Must be one of: ${validStatuses.join(", ")}`
+        );
+      }
+      where.status = { [Op.in]: statuses };
     }
 
-    // 2. Date range filter
+    // 3) date range filter on createdAt
     if (startDate || endDate) {
-      whereConditions.createdAt = {};
+      where.createdAt = {};
       if (startDate) {
-        // Convert startDate to Date and reset time to midnight (start of day)
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);  // Reset time to 00:00:00
-        whereConditions.createdAt[Op.gte] = start;
+        const from = new Date(startDate);
+        if (isNaN(from)) return frontError(res, 400, "Invalid startDate");
+        from.setHours(0, 0, 0, 0);
+        where.createdAt[Op.gte] = from;
       }
-
       if (endDate) {
-        // Convert endDate to Date and reset time to 23:59:59
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);  // Set time to 23:59:59
-        whereConditions.createdAt[Op.lte] = end;
+        const to = new Date(endDate);
+        if (isNaN(to)) return frontError(res, 400, "Invalid endDate");
+        to.setHours(23, 59, 59, 999);
+        where.createdAt[Op.lte] = to;
       }
     }
 
-    // 3. User search filter
+    // 4) user search filter
+    const userWhere = {};
     if (search) {
-      userConditions[Op.or] = [
+      userWhere[Op.or] = [
         { username: { [Op.iLike]: `%${search}%` } },
         { phone: { [Op.iLike]: `%${search}%` } },
       ];
     }
 
-    const bonuswithdrawals = await BonusWithdrawal.findAll({
-      where: whereConditions,
+    // 5) Fetch with associations
+    const bonusWithdrawals = await Withdrawal.findAll({
+      where,
       include: [
-        {
-          model: Bonus, // Assuming you're including Bonus details
-          as: 'bonus',
-          attributes: ['uuid', 'amount', 'type'], // Adjust attributes as per need
-        },
         {
           model: User,
           as: "user",
-          attributes: ["username", "countryCode", "phone", "userTitle"],
-          where: Object.keys(userConditions).length ? userConditions : undefined,
+          attributes: ["uuid", "username", "countryCode", "phone", "userTitle"],
+          where: Object.keys(userWhere).length ? userWhere : undefined,
         },
         {
           model: WithdrawalMethod,
           as: "withdrawalMethod",
+          attributes: ["uuid", "methodType", "accountNumber"],
         },
       ],
       order: [["createdAt", "DESC"]],
     });
 
-    if (!bonuswithdrawals.length)
+    if (!bonusWithdrawals.length) {
       return notFound(res, "No bonus withdrawals found.");
+    }
 
-    return successOkWithData(res, "Bonus withdrawals fetched successfully.", bonuswithdrawals);
+    return successOkWithData(
+      res,
+      "Bonus withdrawals fetched successfully.",
+      bonusWithdrawals
+    );
   } catch (error) {
     console.error("Error fetching all bonus withdrawals:", error);
     return catchError(res, error);
   }
 }
 
-
-// Admin API to approve or reject bonus withdrawal requests
 export async function approveRejectBonusWithdrawal(req, res) {
   const reqBodyFields = bodyReqFields(req, res, ["withdrawalUuid", "action"]);
   if (reqBodyFields.error) return reqBodyFields.response;
@@ -642,59 +800,86 @@ export async function approveRejectBonusWithdrawal(req, res) {
 
   try {
     // ✅ Fetch the withdrawal request by UUID
-    const withdrawalRequest = await BonusWithdrawal.findOne({
+    const withdrawal = await Withdrawal.findOne({
       where: {
         uuid: withdrawalUuid,
       },
     });
 
-    if (!withdrawalRequest) {
+    if (!withdrawal) {
       return validationError(res, "No withdrawal request found with the provided UUID.");
     }
 
-    // ✅ Fetch the associated bonus for this withdrawal request
-    const bonus = await Bonus.findOne({
-      where: {
-        uuid: withdrawalRequest.bonusUuid,
-      },
-    });
-
-    if (!bonus) {
-      return validationError(res, "The associated bonus for this withdrawal request is not found.");
+    // Check if the withdrawal is in a 'pending' status for approval or rejection
+    if (withdrawal.status !== "pending") {
+      return frontError(res, "Only pending requests can be approved or rejected.");
     }
 
-    // ✅ If the action is to approve, update the withdrawal request status
+    console.log("===== withdrawal ===== : ", withdrawal)
+
+    const bonusType = withdrawal.withdrawalType.split("-")[0];
+
     if (action === 'approve') {
-      withdrawalRequest.status = 'approved';
-      await withdrawalRequest.save();
+      // Approve the withdrawal request
+      withdrawal.status = "approved";
+      await withdrawal.save();
 
-      // ✅ Notify the user about the successful approval
+      await Bonus.update(
+        { isWithdrawn: true, },
+        {
+          where: {
+            userUuid: withdrawal.userUuid,
+            isWithdrawn: false,
+            unlockedAfterFirstWithdrawal: true,
+            type: bonusType
+          },
+        }
+      );
+
       await createNotification({
-        userUuid: bonus.userUuid,
-        title: "Bonus Withdrawal Approved",
-        message: `Your ${bonus.type} bonus withdrawal request has been approved.`,
+        userUuid: withdrawal.userUuid,
+        title: "Withdrawal Approved",
+        message: `Your bonus withdrawal request of ₨ ${withdrawal.amount} has been approved.`,
         type: "success",
+        metadata: {
+          withdrawalUuid: withdrawal.uuid,
+          amount: withdrawal.amount,
+        },
       });
 
-      return successOkWithData(res, "Bonus withdrawal request approved successfully.");
-    }
+      return successOkWithData(res, "Bonus withdrawal approved successfully.", withdrawal);
 
-    // ✅ If the action is to reject, update the withdrawal request status to rejected
-    if (action === 'reject') {
-      withdrawalRequest.status = 'rejected';
+    } else if (action === 'reject') {
+      // Reject the withdrawal request
+      withdrawal.status = "rejected";
+      await withdrawal.save();
 
-      // ✅ Save the rejected status to the database
-      await withdrawalRequest.save();
+      await Bonus.update(
+        { isWithdrawn: false, },
+        {
+          where: {
+            userUuid: withdrawal.userUuid,
+            isWithdrawn: true,
+            unlockedAfterFirstWithdrawal: true,
+            type: bonusType
+          },
+        }
+      );
 
-      // ✅ Notify the user about the rejection
+      // Create error notification for the user
       await createNotification({
-        userUuid: bonus.userUuid,
-        title: "Bonus Withdrawal Rejected",
-        message: `Your ${bonus.type} bonus withdrawal request has been rejected.`,
+        userUuid: withdrawal.userUuid,
+        title: "Withdrawal Rejected",
+        message: `Your bonus withdrawal request of ₨ ${withdrawal.amount} has been rejected.`,
         type: "error",
+        metadata: {
+          withdrawalUuid: withdrawal.uuid,
+          amount: withdrawal.amount,
+        },
       });
 
-      return successOkWithData(res, "Bonus withdrawal request rejected successfully.");
+      return successOkWithData(res, "Bonus withdrawal rejected successfully.", withdrawal);
+
     }
   } catch (error) {
     console.error("Error processing bonus withdrawal approval/rejection:", error);

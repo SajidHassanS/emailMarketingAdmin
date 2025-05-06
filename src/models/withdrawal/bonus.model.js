@@ -28,6 +28,10 @@ const Bonus = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    isWithdrawn: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     refereeUuid: {
       type: DataTypes.UUID,
       allowNull: true,
