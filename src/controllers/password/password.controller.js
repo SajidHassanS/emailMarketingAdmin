@@ -166,6 +166,66 @@ export async function addBulkPasswords(req, res) {
 
 // ========================= Update Passwords ============================
 
+// export async function updatePasswords(req, res) {
+//   try {
+//     const reqBodyFields = bodyReqFields(req, res, ["passwords"]);
+//     if (reqBodyFields.error) return reqBodyFields.response;
+
+//     const { passwords } = req.body;
+
+//     if (!Array.isArray(passwords) || passwords.length === 0) {
+//       return validationError(res, "Passwords must be a non-empty array.");
+//     }
+
+//     // // ✅ Validate each password
+//     // const invalidPasswords = passwords.filter((password) =>
+//     //   validatePassword(password)
+//     // );
+//     // if (invalidPasswords.length > 0) {
+//     //   return validationError(
+//     //     res,
+//     //     `Invalid passwords found: ${invalidPasswords.join(
+//     //       ", "
+//     //     )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
+//     //   );
+//     // }
+
+//     // ✅ Check if any passwords already exist in the database
+//     const existingPasswords = await Password.findAll({
+//       where: { password: passwords },
+//     });
+
+//     if (existingPasswords.length > 0) {
+//       const duplicatePasswords = existingPasswords.map((pwd) => pwd.password);
+//       return validationError(
+//         res,
+//         `The following passwords already exist and cannot be reused: ${duplicatePasswords.join(
+//           ", "
+//         )}`
+//       );
+//     }
+
+//     // Mark existing passwords as inactive
+//     await Password.update({ active: false }, { where: { active: true } });
+
+//     // Insert new passwords
+//     const newPasswords = passwords.map((pwd) => ({
+//       password: pwd,
+//       active: true,
+//     }));
+//     await Password.bulkCreate(newPasswords);
+
+//     // Reassign passwords to all users
+//     await assignPasswords();
+
+//     return successOk(res, "Passwords updated successfully.");
+//   } catch (error) {
+//     console.log("===== Error ===== : ", error);
+
+//     return catchError(res, error);
+//   }
+// }
+
 export async function updatePasswords(req, res) {
   try {
     const reqBodyFields = bodyReqFields(req, res, ["passwords"]);
@@ -177,51 +237,56 @@ export async function updatePasswords(req, res) {
       return validationError(res, "Passwords must be a non-empty array.");
     }
 
-    // // ✅ Validate each password
-    // const invalidPasswords = passwords.filter((password) =>
-    //   validatePassword(password)
-    // );
-    // if (invalidPasswords.length > 0) {
-    //   return validationError(
-    //     res,
-    //     `Invalid passwords found: ${invalidPasswords.join(
-    //       ", "
-    //     )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
-    //   );
-    // }
-
     // ✅ Check if any passwords already exist in the database
     const existingPasswords = await Password.findAll({
       where: { password: passwords },
     });
 
-    if (existingPasswords.length > 0) {
-      const duplicatePasswords = existingPasswords.map((pwd) => pwd.password);
-      return validationError(
-        res,
-        `The following passwords already exist and cannot be reused: ${duplicatePasswords.join(
-          ", "
-        )}`
+    const existingPasswordMap = new Map();
+    for (const pwd of existingPasswords) {
+      existingPasswordMap.set(pwd.password, pwd);
+    }
+
+    const passwordsToReactivate = [];
+    const completelyNewPasswords = [];
+
+    for (const pwd of passwords) {
+      const existing = existingPasswordMap.get(pwd);
+      if (existing) {
+        if (!existing.active) {
+          passwordsToReactivate.push(pwd);
+        }
+      } else {
+        completelyNewPasswords.push(pwd);
+      }
+    }
+
+    // ✅ Deactivate all currently active passwords FIRST
+    await Password.update({ active: false }, { where: { active: true } });
+
+    // ✅ Reactivate the inactive ones
+    if (passwordsToReactivate.length > 0) {
+      await Password.update(
+        { active: true },
+        { where: { password: passwordsToReactivate } }
       );
     }
 
-    // Mark existing passwords as inactive
-    await Password.update({ active: false }, { where: { active: true } });
+    // ✅ Insert truly new passwords
+    if (completelyNewPasswords.length > 0) {
+      const newPasswords = completelyNewPasswords.map((pwd) => ({
+        password: pwd,
+        active: true,
+      }));
+      await Password.bulkCreate(newPasswords);
+    }
 
-    // Insert new passwords
-    const newPasswords = passwords.map((pwd) => ({
-      password: pwd,
-      active: true,
-    }));
-    await Password.bulkCreate(newPasswords);
-
-    // Reassign passwords to all users
+    // ✅ Reassign passwords to all users
     await assignPasswords();
 
     return successOk(res, "Passwords updated successfully.");
   } catch (error) {
     console.log("===== Error ===== : ", error);
-
     return catchError(res, error);
   }
 }
