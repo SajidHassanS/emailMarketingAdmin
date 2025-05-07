@@ -89,7 +89,7 @@ export async function registerAdmin(req, res) {
     adminData.countryCode = countryCode
     adminData.password = hashedPassword
     adminData.role = role
-    adminData.verified = true // chnage this based on approval flow
+    adminData.verified = false // change this based on approval flow
 
     // ✅ Create New User in Database
     await Admin.create(adminData);
@@ -121,6 +121,11 @@ export async function loginAdmin(req, res) {
     // Check if a admin with the given username not exists
     const admin = await Admin.findOne({ where: { username } });
     if (!admin) return validationError(res, "Invalid username or password");
+
+    // Check if the account is not verified
+    if (admin.verified === false) {
+      return validationError(res, "Your account is not approved yet. Please contact the Database Administrator.");
+    }
 
     // Compare passwords
     const isMatch = await comparePassword(password, admin.password);
