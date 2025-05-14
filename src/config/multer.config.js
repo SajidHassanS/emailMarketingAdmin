@@ -1,47 +1,46 @@
+// config/multer.config.js
 import multer from "multer";
-import { resolve, extname } from "path";
-import { mkdirSync } from "fs";
-import { diskStorage } from "multer";
+import multerS3 from "multer-s3";
+import { S3Client } from "@aws-sdk/client-s3";
+import { fromEnv } from "@aws-sdk/credential-providers";
+import { extname } from "path";
+import { v4 as uuidv4 } from "uuid";
 
-// Function to create directory if it doesn't exist
-const createDirectoryIfNotExists = (directory) => {
-  try {
-    mkdirSync(directory, { recursive: true });
-  } catch (error) {
-    console.error(`Error creating directory: ${error}`);
-    return frontError(res, `Error creating directory: ${error}`);
-  }
-};
-
-const storage = diskStorage({
-  destination: (req, file, cb) => {
-    const destinationPath = resolve(`${req.storagePath}`); // we have to create a middleware for each different path pattrens and Add it before this middleware ====IMP
-    // Create directory if it doesn't exist
-    createDirectoryIfNotExists(destinationPath);
-
-    cb(null, destinationPath);
-  },
-  filename: (req, file, cb) => {
-    const fileExtension = extname(file.originalname);
-    const filename = `${req.adminUid}${fileExtension}`;
-    cb(null, filename);
-  },
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: fromEnv(),
 });
 
-// Multer instance for handling file uploads
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // Limit file size to 10MB
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif|webp/i; // File types for vidoes |mp4|mkv|avi|mov|quicktime
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Unsupported file format"));
+const storage = multerS3({
+  s3: s3Client,
+  bucket: process.env.S3_BUCKET_NAME,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: (req, file, cb) => {
+    // 1) folder set by middleware: e.g. "static/images/admin/profile-img/<adminUid>"
+    const folder = req.storagePath || "static/images/admin";
+    // 2) optional filenameBase (if middleware set req.filenameBase)
+    let base = req.filenameBase;
+    if (!base) {
+      const field = file.fieldname || "file";
+      const admin = req.adminUid || uuidv4();
+      base = `${field}_${admin}_${Date.now()}`;
     }
+    // 3) preserve extension
+    const fileExt = extname(file.originalname).toLowerCase();
+    // 4) final key
+    const key = `${folder}/${base}${fileExt}`;
+    console.log("→ S3 key:", key);
+    cb(null, key);
   },
 });
 
-export default upload;
+export default multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (!/\.(jpe?g|png|gif|webp)$/i.test(file.originalname)) {
+      return cb(new Error("Unsupported file format"));
+    }
+    cb(null, true);
+  },
+});
