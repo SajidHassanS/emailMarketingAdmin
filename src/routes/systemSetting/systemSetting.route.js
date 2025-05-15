@@ -29,4 +29,16 @@ router
   .post(verifyToken, systemSettingCtrl.setDefaultReferralBonus)
   .patch(verifyToken, systemSettingCtrl.setDefaultReferralBonus);
 
+router
+  .route("/withdrawal-threshold-per-day")
+  .get(verifyToken, systemSettingCtrl.getReferralWithdrawalThresholdPerDay)
+  .post(verifyToken, systemSettingCtrl.setReferralWithdrawalThresholdPerDay)
+  .patch(verifyToken, systemSettingCtrl.setReferralWithdrawalThresholdPerDay);
+
+router
+  .route("/withdrawal-threshold-per-week")
+  .get(verifyToken, systemSettingCtrl.getReferralWithdrawalThresholdPerWeek)
+  .post(verifyToken, systemSettingCtrl.setReferralWithdrawalThresholdPerWeek)
+  .patch(verifyToken, systemSettingCtrl.setReferralWithdrawalThresholdPerWeek);
+
 export default router;

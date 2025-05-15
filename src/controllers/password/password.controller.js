@@ -96,25 +96,45 @@ export async function addBulkPasswords(req, res) {
     if (reqBodyFields.error) return reqBodyFields.response;
 
     let { passwords } = req.body; // Expecting an array of passwords
-    if (!Array.isArray(passwords) || passwords.length === 0) {
-      return validationError(res, "Passwords must be a non-empty array.");
-    }
 
-    // ✅ Validate each password
-    // const invalidPasswords = passwords.filter((password) =>
-    //   validatePassword(password)
-    // );
-    // if (invalidPasswords.length > 0) {
-    //   return validationError(
-    //     res,
-    //     `Invalid passwords found: ${invalidPasswords.join(
-    //       ", "
-    //     )}. Possibel Reasons: 1. Password must be at least 8 characters long.  2. Password must contain at least one uppercase letter, one numeric digit and one special character.`
-    //   );
+    // if (!Array.isArray(passwords) || passwords.length === 0) {
+    //   return validationError(res, "Passwords must be a non-empty array.");
     // }
 
-    // ✅ Prepare the bulk insert data
-    const passwordData = passwords.map((password) => ({
+    if (typeof passwords !== "string" || passwords.trim().length === 0) {
+      return validationError(res, "Passwords must be a non-empty string.");
+    }
+
+    // Split by comma or newline, trim each, and remove empty strings
+    passwords = passwords
+      .split(/[\n,]+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    // Remove duplicates from input
+    const uniquePasswords = [...new Set(passwords)];
+
+    if (uniquePasswords.length === 0) {
+      return validationError(res, "No valid passwords found in the input.");
+    }
+
+    // Get already existing passwords from DB
+    const existingPasswords = await Password.findAll({
+      where: { password: uniquePasswords },
+      attributes: ["password"],
+    });
+
+    const existingSet = new Set(existingPasswords.map((p) => p.password));
+
+    // Filter out passwords already in DB
+    const newPasswords = uniquePasswords.filter((p) => !existingSet.has(p));
+
+    if (newPasswords.length === 0) {
+      return validationError(res, "All provided passwords already exist.");
+    }
+
+    // Prepare data for bulk insert
+    const passwordData = newPasswords.map((password) => ({
       password,
       active: true,
     }));
@@ -151,10 +171,8 @@ export async function addBulkPasswords(req, res) {
 
     return created(
       res,
-      `${passwords.length} passwords added successfully. ${updatedCount} users were updated with new passwords.`
+      `${newPasswords.length} password(s) added successfully. ${existingSet.size} password(s) were skipped because they already exist. ${updatedCount} user(s) were updated with new passwords.`
     );
-
-    // return created(res, `${passwords.length} passwords added successfully.`);
   } catch (error) {
     console.log(error);
     if (error instanceof Sequelize.ValidationError) {
@@ -231,15 +249,28 @@ export async function updatePasswords(req, res) {
     const reqBodyFields = bodyReqFields(req, res, ["passwords"]);
     if (reqBodyFields.error) return reqBodyFields.response;
 
-    const { passwords } = req.body;
+    let { passwords } = req.body;
 
-    if (!Array.isArray(passwords) || passwords.length === 0) {
-      return validationError(res, "Passwords must be a non-empty array.");
+    // ✅ Parse passwords from string (comma or newline separated)
+    if (typeof passwords !== "string" || passwords.trim().length === 0) {
+      return validationError(res, "Passwords must be a non-empty string.");
     }
+
+    passwords = passwords
+      .split(/[\n,]+/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    if (passwords.length === 0) {
+      return validationError(res, "No valid passwords found.");
+    }
+
+    // ✅ Remove duplicates from input
+    const uniquePasswords = [...new Set(passwords)];
 
     // ✅ Check if any passwords already exist in the database
     const existingPasswords = await Password.findAll({
-      where: { password: passwords },
+      where: { password: uniquePasswords },
     });
 
     const existingPasswordMap = new Map();
@@ -284,7 +315,10 @@ export async function updatePasswords(req, res) {
     // ✅ Reassign passwords to all users
     await assignPasswords();
 
-    return successOk(res, "Passwords updated successfully.");
+    return successOk(
+      res,
+      `Passwords updated successfully. ${completelyNewPasswords.length} new, ${passwordsToReactivate.length} reactivated.`
+    );
   } catch (error) {
     console.log("===== Error ===== : ", error);
     return catchError(res, error);

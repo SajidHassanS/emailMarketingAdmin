@@ -17,7 +17,7 @@ export async function getDefaultEmailReward(req, res) {
       where: { key: "default_email_reward" },
     });
 
-    if (!setting) return notFound(res, "No email reward found.")
+    if (!setting) return notFound(res, "No email reward found.");
 
     const reward = parseInt(setting.value);
 
@@ -74,7 +74,7 @@ export async function getReferralWithdrawalThreshold(req, res) {
       where: { key: "referral_withdrawal_threshold" },
     });
 
-    if (!setting) return notFound(res, "No withdrawal threshold found.")
+    if (!setting) return notFound(res, "No withdrawal threshold found.");
 
     const threshold = parseInt(setting.value);
 
@@ -132,7 +132,7 @@ export async function getDefaultSignupBonus(req, res) {
       where: { key: "default_signup_bonus" },
     });
 
-    if (!setting) return notFound(res, "No signup bonus found.")
+    if (!setting) return notFound(res, "No signup bonus found.");
 
     const bonus = parseInt(setting.value);
 
@@ -189,7 +189,7 @@ export async function getDefaultReferralBonus(req, res) {
       where: { key: "default_referral_bonus" },
     });
 
-    if (!setting) return notFound(res, "No referral bonus found.")
+    if (!setting) return notFound(res, "No referral bonus found.");
 
     const bonus = parseInt(setting.value);
 
@@ -234,6 +234,139 @@ export async function setDefaultReferralBonus(req, res) {
     return successOk(res, `Default referral bonus set to ${bonus}.`);
   } catch (error) {
     console.log("Error setting referral bonus: ", error);
+    return catchError(res, error);
+  }
+}
+
+// ================== Get Withdrawal Threshold Per Day =======================
+
+export async function getReferralWithdrawalThresholdPerDay(req, res) {
+  try {
+    const setting = await SystemSetting.findOne({
+      where: { key: "referral_withdrawal_threshold_per_day" },
+    });
+
+    if (!setting)
+      return notFound(res, "No withdrawal threshold per day found.");
+
+    const threshold = parseInt(setting.value);
+
+    if (isNaN(threshold)) {
+      return notFound(res, "Invalid withdrawal threshold per day value.");
+    }
+
+    return successOkWithData(
+      res,
+      "Referral withdrawal threshold per day fetched successfully.",
+      { referralWithdrawalThresholdPerDay: threshold }
+    );
+  } catch (error) {
+    console.log(
+      "Error fetching referral withdrawal threshold per day: ",
+      error
+    );
+    return catchError(res, error);
+  }
+}
+
+// ================ Add/Update Withdrawal Threshold Per Day =======================
+
+export async function setReferralWithdrawalThresholdPerDay(req, res) {
+  try {
+    const reqBodyFields = bodyReqFields(req, res, ["threshold"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { threshold } = req.body;
+
+    if (isNaN(threshold) || threshold <= 0) {
+      return frontError(res, "Threshold must be a valid positive number.");
+    }
+
+    // Create or update the threshold value
+    const [setting, created] = await SystemSetting.findOrCreate({
+      where: { key: "referral_withdrawal_threshold_per_day" },
+      defaults: { value: threshold.toString() },
+    });
+
+    if (!created) {
+      setting.value = threshold.toString();
+      await setting.save();
+    }
+
+    return successOk(
+      res,
+      `Referral withdrawal threshold per day set to ${threshold}.`
+    );
+  } catch (error) {
+    console.log("Error setting referral withdrawal threshold per day: ", error);
+    return catchError(res, error);
+  }
+}
+
+// ================== Get Withdrawal Threshold Per Week =======================
+
+export async function getReferralWithdrawalThresholdPerWeek(req, res) {
+  try {
+    const setting = await SystemSetting.findOne({
+      where: { key: "referral_withdrawal_threshold_per_week" },
+    });
+
+    if (!setting)
+      return notFound(res, "No withdrawal threshold per week found.");
+
+    const threshold = parseInt(setting.value);
+
+    if (isNaN(threshold)) {
+      return notFound(res, "Invalid withdrawal threshold per week value.");
+    }
+
+    return successOkWithData(
+      res,
+      "Referral withdrawal threshold per week fetched successfully.",
+      { referralWithdrawalThresholdPerWeek: threshold }
+    );
+  } catch (error) {
+    console.log(
+      "Error fetching referral withdrawal threshold per week: ",
+      error
+    );
+    return catchError(res, error);
+  }
+}
+
+// ================ Add/Update Withdrawal Threshold Per Week =======================
+
+export async function setReferralWithdrawalThresholdPerWeek(req, res) {
+  try {
+    const reqBodyFields = bodyReqFields(req, res, ["threshold"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { threshold } = req.body;
+
+    if (isNaN(threshold) || threshold <= 0) {
+      return frontError(res, "Threshold must be a valid positive number.");
+    }
+
+    // Create or update the threshold value
+    const [setting, created] = await SystemSetting.findOrCreate({
+      where: { key: "referral_withdrawal_threshold_per_week" },
+      defaults: { value: threshold.toString() },
+    });
+
+    if (!created) {
+      setting.value = threshold.toString();
+      await setting.save();
+    }
+
+    return successOk(
+      res,
+      `Referral withdrawal threshold per week set to ${threshold}.`
+    );
+  } catch (error) {
+    console.log(
+      "Error setting referral withdrawal threshold per week: ",
+      error
+    );
     return catchError(res, error);
   }
 }

@@ -13,7 +13,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { domain } from "./config/initialConfig.js";
 // import passport from "./config/passport.js";
-import http from 'http';  // This imports the http module
+import http from "http"; // This imports the http module
 
 // =========================================
 //             Code Import
@@ -33,6 +33,7 @@ import emailRoutes from "./routes/email/email.route.js";
 import systemSettingRoutes from "./routes/systemSetting/systemSetting.route.js";
 import withdrawalRoutes from "./routes/withdrawal/withdrawal.route.js";
 import messageRoutes from "./routes/message/message.route.js";
+import marqueeRoutes from "./routes/marquee/marquee.route.js";
 
 // =========================================
 //            Configurations
@@ -99,6 +100,7 @@ app.use("/api/email", emailRoutes);
 app.use("/api/system-setting", systemSettingRoutes);
 app.use("/api/withdrawal", withdrawalRoutes);
 app.use("/api/chat", messageRoutes);
+app.use("/api/marquee", marqueeRoutes);
 
 // =========================================
 //            Global Error Handler

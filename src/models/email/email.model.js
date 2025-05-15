@@ -15,6 +15,10 @@ const Email = sequelize.define(
       allowNull: false,
       validate: { isEmail: true }, // Ensure valid email format
     },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
