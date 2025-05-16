@@ -14,9 +14,14 @@ router
 
 router.route("/bulk-insert").post(verifyToken, emailCtrl.bulkEmailEntry); // Bulk insert email's
 
+router.route("/bulk-delete").post(verifyToken, emailCtrl.bulkDeleteEmails); // Bulk insert email's
+
+router
+  .route("/bulk-update-by-uuids")
+  .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByUuids); // Bulk update email's status
+
 router
   .route("/bulk-update")
-  // .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByUuids); // Bulk update email's status // old api
   .patch(verifyToken, emailCtrl.bulkUpdateEmailStatusByEmails); // Bulk update email's status
 
 router.route("/stats").get(verifyToken, emailCtrl.getEmailStats); // Email stats

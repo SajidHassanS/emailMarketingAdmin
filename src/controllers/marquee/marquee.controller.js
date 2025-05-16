@@ -99,7 +99,7 @@ export const updateMarqueeMessage = async (req, res) => {
       responseMessage = "Live marquee message updated.";
     } else if (changes.includes("enabled") || changes.includes("disabled")) {
       responseMessage = `Marquee message ${
-        isEnabled ? "enabled" : "disabled"
+        found.isEnabled ? "enabled" : "disabled"
       }.`;
     }
 
@@ -130,20 +130,33 @@ export const deleteMarqueeMessage = async (req, res) => {
 
 export const reorderMarqueeMessages = async (req, res) => {
   try {
-    const { ids } = req.body;
-    if (!Array.isArray(ids)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid request data." });
+    const reqBodyFields = bodyReqFields(req, res, ["uuids"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { uuids } = req.body;
+
+    // Validate that uuids is an array and not empty
+    if (!Array.isArray(uuids) || uuids.length === 0) {
+      return frontError(res, "Invalid or empty UUID list.", "uuids");
     }
 
-    const updatePromises = ids.map((id, index) =>
-      MarqueeMessage.update({ order: index }, { where: { id } })
+    // Validate that all provided UUIDs exist
+    const foundMessages = await MarqueeMessage.findAll({
+      where: { uuid: uuids },
+    });
+
+    if (foundMessages.length !== uuids.length) {
+      return frontError(res, "Some UUIDs are invalid.", "uuids");
+    }
+
+    // Update order based on index in array
+    const updatePromises = uuids.map((uuid, index) =>
+      MarqueeMessage.update({ order: index }, { where: { uuid } })
     );
 
     await Promise.all(updatePromises);
 
-    return successOkWithData(res, "Marquee messages order updated.");
+    return successOk(res, "Marquee messages reordered successfully.");
   } catch (err) {
     console.error("reorderMarqueeMessages error:", err);
     return catchError(res, err);

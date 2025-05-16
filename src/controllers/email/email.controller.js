@@ -453,76 +453,133 @@ export async function bulkEmailEntry(req, res) {
   }
 }
 
-// ===================== Bulk Update Email Status ===========================
+// ======================= Bulk Delete Emails  ==============================
 
-// dont remove this api.
-// export async function bulkUpdateEmailStatusByUuids(req, res) {
-//   try {
-//     const reqBodyFields = bodyReqFields(req, res, ["uuids", "status"]);
-//     if (reqBodyFields.error) return reqBodyFields.response;
+export async function bulkDeleteEmails(req, res) {
+  try {
+    const reqBodyFields = bodyReqFields(req, res, ["emails"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
 
-//     const { uuids, status, remarks = null } = req.body;
+    const { emails } = req.body;
 
-//     if (!Array.isArray(uuids) || uuids.length === 0) {
-//       return frontError(res, "'uuids' must be a non-empty array.");
-//     }
+    // Parse emails from string: comma or newline separated
+    const emailList = emails
+      .split(/[\n,]+/)
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
 
-//     const allowedStatuses = ["good", "bad", "pending"];
-//     if (!allowedStatuses.includes(status)) {
-//       return frontError(
-//         res,
-//         "Invalid status. Allowed values are: good, bad, pending"
-//       );
-//     }
+    if (emailList.length === 0)
+      return validationError(res, "No valid emails provided.");
 
-//     // Fetch all emails with userUuid and email for notification
-//     const emails = await Email.findAll({
-//       where: { uuid: uuids },
-//       attributes: ["uuid", "email", "userUuid"],
-//     });
+    // Find matching emails
+    const existingEmails = await Email.findAll({
+      where: { email: emailList },
+      attributes: ["uuid", "email"],
+    });
 
-//     const foundUuids = emails.map((e) => e.uuid);
-//     const invalidUuids = uuids.filter((id) => !foundUuids.includes(id));
+    const foundEmails = existingEmails.map((e) => e.email);
 
-//     if (invalidUuids.length) {
-//       return frontError(res, `Invalid UUID(s): ${invalidUuids.join(", ")}`);
-//     }
+    // Delete existing ones
+    const [deletedCount] = await Email.destroy({
+      where: { email: foundEmails },
+    });
 
-//     // Fetch reward only once
-//     let rewardAmount = 0;
-//     if (status === "good") {
-//       const defaultReward = await SystemSetting.findOne({
-//         where: { key: "default_email_reward" },
-//       });
-//       rewardAmount = defaultReward ? parseInt(defaultReward.value) : 20;
-//     }
+    const notFoundCount = emailList.length - foundEmails.length;
 
-//     // Update each email individually with reward/amount
-//     for (const email of emails) {
-//       await Email.update(
-//         {
-//           status,
-//           remarks,
-//           amount: status === "good" ? rewardAmount : 0,
-//         },
-//         { where: { uuid: email.uuid } }
-//       );
+    // Build human-friendly message
+    let messageParts = [];
 
-//       // Send Notification
-//       await createNotification({
-//         userUuid: email.userUuid,
-//         title: "Email Status Updated",
-//         message: `The status of your email (${email.email}) has been updated to "${status}".`,
-//         type: "info",
-//       });
-//     }
+    if (deletedCount > 0)
+      messageParts.push(
+        `Deleted ${deletedCount} email${deletedCount > 1 ? "s" : ""}`
+      );
 
-//     return successOk(res, "Email statuses updated successfully");
-//   } catch (error) {
-//     console.log("===== Error ===== : ", error);
-//     return catchError(res, error);
-//   }
-// }
+    if (notFoundCount > 0)
+      messageParts.push(
+        `${notFoundCount} email${notFoundCount > 1 ? "s" : ""} not found`
+      );
+
+    if (messageParts.length === 0)
+      messageParts.push("No valid emails found to delete");
+
+    const finalMessage = messageParts.join(". ") + ".";
+
+    return successOk(res, finalMessage);
+  } catch (error) {
+    console.log("deleteEmailsBulk error:", error);
+    return catchError(res, error);
+  }
+}
+
+// ===================== Bulk Update Email Status By Uuid ===========================
+
+export async function bulkUpdateEmailStatusByUuids(req, res) {
+  try {
+    const reqBodyFields = bodyReqFields(req, res, ["uuids", "status"]);
+    if (reqBodyFields.error) return reqBodyFields.response;
+
+    const { uuids, status, remarks = null } = req.body;
+
+    if (!Array.isArray(uuids) || uuids.length === 0) {
+      return frontError(res, "'uuids' must be a non-empty array.");
+    }
+
+    const allowedStatuses = ["good", "bad", "pending"];
+    if (!allowedStatuses.includes(status)) {
+      return frontError(
+        res,
+        "Invalid status. Allowed values are: good, bad, pending"
+      );
+    }
+
+    // Fetch all emails with userUuid and email for notification
+    const emails = await Email.findAll({
+      where: { uuid: uuids },
+      attributes: ["uuid", "email", "userUuid"],
+    });
+
+    const foundUuids = emails.map((e) => e.uuid);
+    const invalidUuids = uuids.filter((id) => !foundUuids.includes(id));
+
+    if (invalidUuids.length) {
+      return frontError(res, `Invalid UUID(s): ${invalidUuids.join(", ")}`);
+    }
+
+    // Fetch reward only once
+    let rewardAmount = 0;
+    if (status === "good") {
+      const defaultReward = await SystemSetting.findOne({
+        where: { key: "default_email_reward" },
+      });
+      rewardAmount = defaultReward ? parseInt(defaultReward.value) : 20;
+    }
+
+    // Update each email individually with reward/amount
+    for (const email of emails) {
+      await Email.update(
+        {
+          status,
+          remarks,
+          amount: status === "good" ? rewardAmount : 0,
+        },
+        { where: { uuid: email.uuid } }
+      );
+
+      // Send Notification
+      await createNotification({
+        userUuid: email.userUuid,
+        title: "Email Status Updated",
+        message: `The status of your email (${email.email}) has been updated to "${status}".`,
+        type: "info",
+      });
+    }
+
+    return successOk(res, "Email statuses updated successfully");
+  } catch (error) {
+    console.log("===== Error ===== : ", error);
+    return catchError(res, error);
+  }
+}
 
 // no negative reward
 // export async function bulkUpdateEmailStatusByEmails(req, res) {

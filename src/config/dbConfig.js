@@ -1,11 +1,11 @@
 import { Sequelize } from "sequelize";
 import chalk from "chalk";
+import { dbUrl } from "./initialConfig.js";
 
 // You can move these to a config file later
 const dbName = "project3";
 const dbUser = "postgres";
 const dbPass = "hassan526688";
-// const dbHost = "project3.c7q4kemc23tb.eu-north-1.rds.amazonaws.com";
 const dbHost = "project3.c7q4kemc23tb.eu-north-1.rds.amazonaws.com";
 
 const sequelize = new Sequelize(dbName, dbUser, dbPass, {
@@ -21,7 +21,6 @@ const sequelize = new Sequelize(dbName, dbUser, dbPass, {
   logging: console.log, // Optional: shows SQL queries
 });
 
-// import { dbUrl } from "./initialConfig.js";
 // const sequelize = new Sequelize(dbUrl);
 
 export const connectDB = async () => {
@@ -31,10 +30,7 @@ export const connectDB = async () => {
 
     await sequelize.authenticate();
 
-    console.log(
-      chalk.green.bold(`Connected to the database ${dbName} ${dbHost}`)
-      // chalk.green.bold(`Connected to the database`)
-    );
+    console.log(chalk.green.bold(`Connected to the database`));
     await sequelize.sync();
     console.log(chalk.green.bold("✅ Models synced successfully"));
   } catch (error) {

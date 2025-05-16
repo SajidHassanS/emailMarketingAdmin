@@ -34,6 +34,7 @@ import systemSettingRoutes from "./routes/systemSetting/systemSetting.route.js";
 import withdrawalRoutes from "./routes/withdrawal/withdrawal.route.js";
 import messageRoutes from "./routes/message/message.route.js";
 import marqueeRoutes from "./routes/marquee/marquee.route.js";
+import faqRoutes from "./routes/faq/faq.route.js";
 
 // =========================================
 //            Configurations
@@ -101,6 +102,7 @@ app.use("/api/system-setting", systemSettingRoutes);
 app.use("/api/withdrawal", withdrawalRoutes);
 app.use("/api/chat", messageRoutes);
 app.use("/api/marquee", marqueeRoutes);
+app.use("/api/faq", faqRoutes);
 
 // =========================================
 //            Global Error Handler

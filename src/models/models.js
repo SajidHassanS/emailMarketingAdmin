@@ -13,6 +13,7 @@ import BonusWithdrawal from "./withdrawal/bonusWithdrawal.model.js";
 import Message from "./message/message.model.js";
 import Phone from "./user/phone.model.js";
 import MarqueeMessage from "./marquee/marquee.model.js";
+import FAQ from "./faq/faq.model.js";
 
 const models = {
   User,
@@ -30,6 +31,7 @@ const models = {
   Message,
   Phone, // user phone model
   MarqueeMessage,
+  FAQ,
 };
 
 export default models;
