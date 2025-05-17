@@ -210,7 +210,7 @@ export async function handleWithdrawal(req, res) {
     const reqBodyFields = bodyReqFields(req, res, ["withdrawalUuid", "action"]);
     if (reqBodyFields.error) return reqBodyFields.response;
 
-    const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
+    const { withdrawalUuid, action, remarks } = req.body; // action can be 'approve' or 'reject'
 
     // Validate action type
     if (!['approve', 'reject'].includes(action)) {
@@ -230,8 +230,15 @@ export async function handleWithdrawal(req, res) {
     }
 
     if (action === 'approve') {
+      // Validate required fields for approval
+      if (!remarks) return validationError(res, "'remarks' is required for approval.");
+      if (!req.file) return validationError(res, "Payment screenshot is required for approval.");
+
       // Approve the withdrawal request
       withdrawal.status = "approved";
+      withdrawal.paymentScreenshot = req.file.key
+      withdrawal.remarks = remarks;
+
       await withdrawal.save();
 
       // After approval, set negative withdrawn email amounts to 0

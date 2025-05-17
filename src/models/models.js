@@ -14,6 +14,7 @@ import Message from "./message/message.model.js";
 import Phone from "./user/phone.model.js";
 import MarqueeMessage from "./marquee/marquee.model.js";
 import FAQ from "./faq/faq.model.js";
+import Instruction from "./instruction/instruction.model.js";
 
 const models = {
   User,
@@ -32,6 +33,7 @@ const models = {
   Phone, // user phone model
   MarqueeMessage,
   FAQ,
+  Instruction
 };
 
 export default models;

@@ -1,6 +1,8 @@
 import express from "express";
 import * as withdrawalCtrl from "../../controllers/withdrawal/withdrawal.controller.js";
 import verifyToken from "../../middlewares/authMiddleware.js";
+import upload from "../../config/multer.config.js";
+import { setPaymentScreenshotFilename, setPaymentScreenshotPath } from "../../middlewares/multer.middleware.js";
 
 const router = express.Router();
 
@@ -8,7 +10,7 @@ const router = express.Router();
 router.route("/all").get(verifyToken, withdrawalCtrl.getAllWithdrawals); // Get all withdrawal requests
 // router.route("/handle").patch(verifyToken, withdrawalCtrl.handleWithdrawalApproval); // approve/reject pending bonus withdrawal request
 
-router.route("/handle").patch(verifyToken, withdrawalCtrl.handleWithdrawal); // approve/reject pending bonus withdrawal request
+router.route("/handle").patch(verifyToken, setPaymentScreenshotPath, setPaymentScreenshotFilename, upload.single("paymentScreenshot"), withdrawalCtrl.handleWithdrawal); // approve/reject pending bonus withdrawal request
 
 // router.route("/approve").patch(verifyToken, withdrawalCtrl.approveWithdrawal); // approve pending withdrawal request
 

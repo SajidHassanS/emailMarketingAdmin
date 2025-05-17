@@ -49,6 +49,8 @@ export async function getAllEmails(req, res) {
   try {
     // const userUid = req.userUid;
 
+    console.log("===== get all emails api hit =====")
+
     const {
       status,
       startDate,
@@ -100,6 +102,8 @@ export async function getAllEmails(req, res) {
     });
 
     if (!emails.length) return notFound(res, "No emails found.");
+
+    console.log("===== emails =====: ", emails)
 
     return successOkWithData(res, "Profile fetched successfully", emails);
   } catch (error) {
@@ -515,6 +519,8 @@ export async function bulkDeleteEmails(req, res) {
 
 export async function bulkUpdateEmailStatusByUuids(req, res) {
   try {
+    console.log("===== bulkUpdateEmailStatusByUuids =====")
+
     const reqBodyFields = bodyReqFields(req, res, ["uuids", "status"]);
     if (reqBodyFields.error) return reqBodyFields.response;
 
@@ -544,6 +550,8 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
     if (invalidUuids.length) {
       return frontError(res, `Invalid UUID(s): ${invalidUuids.join(", ")}`);
     }
+
+    console.log("===== emails =====: ", emails)
 
     // Fetch reward only once
     let rewardAmount = 0;
@@ -666,6 +674,7 @@ export async function bulkUpdateEmailStatusByUuids(req, res) {
 
 export async function bulkUpdateEmailStatusByEmails(req, res) {
   try {
+    console.log("===== bulkUpdateEmailStatusByEmails =====")
     const reqBodyFields = bodyReqFields(req, res, ["emails", "status"]);
     if (reqBodyFields.error) return reqBodyFields.response;
     const { emails, status, remarks = null } = req.body;
@@ -701,6 +710,12 @@ export async function bulkUpdateEmailStatusByEmails(req, res) {
     if (foundEmails.length === 0) {
       return frontError(res, "None of the provided emails exist.");
     }
+
+    console.log("===== emails =====: ", emails)
+    console.log("===== existingEmails =====: ", existingEmails)
+    console.log("===== foundEmails =====: ", foundEmails)
+    console.log("===== missingEmails =====: ", missingEmails)
+
     // ALWAYS load the default reward, regardless of the target status
     const defaultRewardSetting = await SystemSetting.findOne({
       where: { key: "default_email_reward" },
@@ -754,9 +769,8 @@ export async function bulkUpdateEmailStatusByEmails(req, res) {
     }
     let message = `${updatedCount} email(s) updated successfully.`;
     if (missingEmails.length) {
-      message += ` ${
-        missingEmails.length
-      } email(s) not found: ${missingEmails.join(", ")}`;
+      message += ` ${missingEmails.length
+        } email(s) not found: ${missingEmails.join(", ")}`;
     }
     return successOk(res, message);
   } catch (error) {

@@ -30,3 +30,17 @@ export async function setProfileFilename(req, res, next) {
   req.filenameBase = `${admin.username || req.adminUid}_${Date.now()}_profile`;
   next();
 }
+
+export function setPaymentScreenshotPath(req, res, next) {
+  const adminUid = req.adminUid;
+  if (!adminUid) return frontError(res, "Admin UID not found.");
+  req.storagePath = `static/images/admin/withdrawals/${adminUid}`;
+  next();
+}
+
+export async function setPaymentScreenshotFilename(req, res, next) {
+  const admin = await Admin.findByPk(req.adminUid);
+  if (!admin) return frontError(res, "Invalid admin UID.");
+  req.filenameBase = `${admin.username || req.adminUid}_${Date.now()}_withdrawal`;
+  next();
+}

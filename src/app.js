@@ -35,6 +35,7 @@ import withdrawalRoutes from "./routes/withdrawal/withdrawal.route.js";
 import messageRoutes from "./routes/message/message.route.js";
 import marqueeRoutes from "./routes/marquee/marquee.route.js";
 import faqRoutes from "./routes/faq/faq.route.js";
+import instructionRoutes from "./routes/instruction/instruction.route.js";
 
 // =========================================
 //            Configurations
@@ -103,6 +104,7 @@ app.use("/api/withdrawal", withdrawalRoutes);
 app.use("/api/chat", messageRoutes);
 app.use("/api/marquee", marqueeRoutes);
 app.use("/api/faq", faqRoutes);
+app.use("/api/instruction", instructionRoutes);
 
 // =========================================
 //            Global Error Handler

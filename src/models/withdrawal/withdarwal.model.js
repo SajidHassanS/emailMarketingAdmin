@@ -34,6 +34,12 @@ const Withdrawal = sequelize.define(
       type: DataTypes.ENUM("pending", "approved", "rejected"),
       defaultValue: "pending",
     },
+    remarks: {
+      type: DataTypes.STRING,
+    },
+    paymentScreenshot: {
+      type: DataTypes.STRING,
+    },
   },
   {
     underscored: true,

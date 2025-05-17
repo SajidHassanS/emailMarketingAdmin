@@ -27,6 +27,7 @@ import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
 // import SystemSetting from "../../models/systemSetting/systemSetting.model"
 import models from "../../models/models.js";
 import { createNotification } from "../notification/notification.controller.js";
+import Email from "../../models/email/email.model.js";
 const { Admin, User, Bonus, Password, Phone, SystemSetting } = models
 
 // ========================= Helping Functions ============================
@@ -171,11 +172,27 @@ export async function getSuppliersList(req, res) {
           passwordAssignCounter++;
         }
 
+        // ✅ Calculate available balance per supplier
+        const emails = await Email.findAll({
+          where: { userUuid: supplier.uuid },
+          attributes: ["amount", "status", "isWithdrawn"],
+        });
+
+        let availableBalance = 0;
+        for (const email of emails) {
+          if (email.status === "good" && !email.isWithdrawn) {
+            availableBalance += email.amount;
+          } else if (email.isWithdrawn && email.amount < 0) {
+            availableBalance += email.amount;
+          }
+        }
+
         return {
           ...supplier.toJSON(),
           createdBy: supplier.createdBy
             ? adminMap[supplier.createdBy]?.username || supplier.createdBy
             : null,
+          availableBalance,
         };
       })
     );
