@@ -47,24 +47,50 @@ const { Admin, User, Bonus, Password, Phone, SystemSetting } = models
 //   return `${category}${formattedNumber}_${username}`;
 // };
 
+// issue : repeated userTitle - 20-05-2025
+// const generateUserTitle = async (category, username) => {
+//   // Count users with userTitle starting with the given category letter
+//   const userCountWithCategory = await User.count({
+//     where: {
+//       userTitle: {
+//         [Op.startsWith]: category,
+//       },
+//     },
+//   });
+
+//   // Add 1 to get the next user number
+//   const newNumber = userCountWithCategory + 1;
+
+//   // Format number as 4-digit
+//   const formattedNumber = String(newNumber).padStart(4, "0");
+
+//   return `${category}${formattedNumber}_${username}`;
+// };
+
 const generateUserTitle = async (category, username) => {
-  // Count users with userTitle starting with the given category letter
-  const userCountWithCategory = await User.count({
+  // Find the user with the highest userTitle starting with the category
+  const lastUser = await User.findOne({
     where: {
       userTitle: {
-        [Op.startsWith]: category,
+        [Op.like]: `${category}_____%`, // e.g., A0001_username
       },
     },
+    order: [['userTitle', 'DESC']],
   });
 
-  // Add 1 to get the next user number
-  const newNumber = userCountWithCategory + 1;
+  let newNumber = 1;
 
-  // Format number as 4-digit
+  if (lastUser) {
+    const match = lastUser.userTitle.match(/^([A-Z])(\d{4})_/);
+    if (match) {
+      newNumber = parseInt(match[2], 10) + 1;
+    }
+  }
+
   const formattedNumber = String(newNumber).padStart(4, "0");
-
   return `${category}${formattedNumber}_${username}`;
 };
+
 
 // ========================= Get All Suppliers ============================
 
