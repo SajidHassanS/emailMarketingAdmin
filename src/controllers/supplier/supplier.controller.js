@@ -1,5 +1,12 @@
+import fs from 'fs';
+import path from 'path';
+import { google } from 'googleapis';
+import { fileURLToPath } from 'url';
 import { Op, Sequelize } from "sequelize";
+import models from "../../models/models.js";
 import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
+import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
+import { createNotification } from "../notification/notification.controller.js";
 import {
   created,
   catchError,
@@ -9,7 +16,6 @@ import {
   frontError,
   validationError,
 } from "../../utils/responses.js";
-// import Project from "../../models/project/project.model.js";
 import {
   convertToLowercase,
   isValidCategory,
@@ -17,55 +23,32 @@ import {
   validatePhone,
   validateUsername,
 } from "../../utils/utils.js";
-// import Admin from "../../models/user/user.model.js";
-// import Employer from "../../models/employer/employer.model.js";
-// import User from "../../models/user/user.model.js";
-import { hashPassword, validatePassword } from "../../utils/passwordUtils.js";
-// import Admin from "../../models/admin/admin.model.js";
-// import Password from "../../models/password/password.model.js";
-// import Phone from "../../models/user/phone.model.js";
-// import SystemSetting from "../../models/systemSetting/systemSetting.model"
-import models from "../../models/models.js";
-import { createNotification } from "../notification/notification.controller.js";
-import Email from "../../models/email/email.model.js";
-const { Admin, User, Bonus, Password, Phone, SystemSetting } = models
+const { Admin, Email, User, Bonus, Password, Phone, SystemSetting } = models
+
+// __dirname workaround for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load OAuth2 credentials and tokens
+const CREDENTIALS_PATH = path.join(__dirname, "../../../credentials.json");
+const TOKENS_PATH = path.join(__dirname, "../../../tokens.json");
+
+const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf8")).web;
+const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, "utf8"));
+
+// OAuth2 client setup
+const oauth2Client = new google.auth.OAuth2(
+  credentials.client_id,
+  credentials.client_secret,
+  credentials.redirect_uris[0]
+);
+
+oauth2Client.setCredentials(tokens);
+
+// Instantiate the People API service
+const peopleService = google.people({ version: "v1", auth: oauth2Client });
 
 // ========================= Helping Functions ============================
-
-// const generateUserTitle = async (category, userUid, username) => {
-//   // Find the user's registration position based on created_at
-//   const userNumber = await User.count({
-//     where: {
-//       createdAt: { [Op.lte]: (await User.findByPk(userUid)).createdAt },
-//     },
-//   });
-
-//   // Format userNumber as a 4-digit number
-//   const formattedNumber = String(userNumber).padStart(4, "0");
-
-//   // Construct the userTitle
-//   return `${category}${formattedNumber}_${username}`;
-// };
-
-// issue : repeated userTitle - 20-05-2025
-// const generateUserTitle = async (category, username) => {
-//   // Count users with userTitle starting with the given category letter
-//   const userCountWithCategory = await User.count({
-//     where: {
-//       userTitle: {
-//         [Op.startsWith]: category,
-//       },
-//     },
-//   });
-
-//   // Add 1 to get the next user number
-//   const newNumber = userCountWithCategory + 1;
-
-//   // Format number as 4-digit
-//   const formattedNumber = String(newNumber).padStart(4, "0");
-
-//   return `${category}${formattedNumber}_${username}`;
-// };
 
 const generateUserTitle = async (category, username) => {
   // Find the user with the highest userTitle starting with the category
@@ -91,6 +74,55 @@ const generateUserTitle = async (category, username) => {
   return `${category}${formattedNumber}_${username}`;
 };
 
+// ====================================================================
+
+async function createOrUpdateContact(displayName, phoneNumber) {
+  // Normalize to just digits for matching
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+
+  try {
+    const searchRes = await peopleService.people.searchContacts({
+      query: cleanPhone,
+      readMask: 'names,phoneNumbers',
+      pageSize: 10,
+      // restrict to your “Contacts” source so you don’t get directory/profile entries
+      sources: ['READ_SOURCE_TYPE_CONTACT']
+    });
+
+    // Look through the hits for an exact phone match
+    const people = (searchRes.data.results || []).map(r => r.person);
+    const existing = people.find(person =>
+      (person.phoneNumbers || []).some(p =>
+        p.value.replace(/\D/g, '') === cleanPhone
+      )
+    );
+
+    if (existing) {
+      const updateRes = await peopleService.people.updateContact({
+        resourceName: existing.resourceName,
+        updatePersonFields: 'names,phoneNumbers',
+        requestBody: {
+          names: [{ displayName, givenName: displayName }],
+          phoneNumbers: [{ value: phoneNumber }],
+        },
+      });
+      return updateRes.data;
+    } else {
+      const createRes = await peopleService.people.createContact({
+        requestBody: {
+          names: [{ displayName, givenName: displayName }],
+          phoneNumbers: [{ value: phoneNumber }],
+        },
+      });
+      return createRes.data;
+    }
+
+  } catch (err) {
+    console.error('Error saving contact:', err);
+    return { error: err.message };
+  }
+}
+
 
 // ========================= Get All Suppliers ============================
 
@@ -108,8 +140,6 @@ export async function getSuppliersList(req, res) {
       updatedFrom,
       updatedTo,
     } = req.query;
-
-    console.log("===== req.query ===== : ", req.query);
 
     const where = {};
     if (active !== undefined) where.active = active === "true";
@@ -134,9 +164,6 @@ export async function getSuppliersList(req, res) {
     // if (deadline) where.deadline = { [Op.lte]: deadline };
     const supplierList = await User.findAll({
       where,
-      // where: {
-      //     active: true
-      // },
       order: [["createdAt", "Desc"]],
       raw: false,
     });
@@ -162,19 +189,6 @@ export async function getSuppliersList(req, res) {
       adminDetails.map((admin) => [admin.uuid, admin])
     );
 
-    // // Attach admin username to suppliers
-    // const suppliersWithAdmin = supplierList.map((supplier) => ({
-    //   ...supplier,
-    //   createdBy: supplier.createdBy
-    //     ? adminMap[supplier.createdBy]?.username || supplier.createdBy
-    //     : null,
-    // }));
-
-    // return successOkWithData(
-    //   res,
-    //   "Suppliers retrieved successfully.",
-    //   suppliersWithAdmin
-    // );
     // Get active passwords
     const passwords = await Password.findAll({
       where: { active: true },
@@ -229,7 +243,7 @@ export async function getSuppliersList(req, res) {
       suppliersWithAdmin
     );
   } catch (error) {
-    console.log(error);
+    console.error("===== error in getSupplierList ===== : ", error);
     return catchError(res, error);
   }
 }
@@ -281,10 +295,6 @@ export async function getAdminsSimpleList(req, res) {
 export async function addNewSupplier(req, res) {
   try {
     const adminUid = req.adminUid;
-
-    // const adminExist = await Admin.findByPk(userUid)
-    // console.log(adminExist)
-    // if (adminExist) return frontError(res, "Invalid token.")
 
     // ✅ Check if required fields are provided
     const reqBodyFields = bodyReqFields(req, res, [
@@ -410,7 +420,7 @@ export async function addNewSupplier(req, res) {
       return created(res, "User profile created successfully.");
     }
   } catch (error) {
-    console.log(error);
+    console.error("===== error in addNewSupplier ===== : ", error);
     if (error instanceof Sequelize.ValidationError) {
       return sequelizeValidationError(res, error);
     }
@@ -480,9 +490,8 @@ export async function updateSupplierDetail(req, res) {
       const hashedPassword = await hashPassword(password);
       fieldsToUpdate.password = hashedPassword;
     }
-    fieldsToUpdate.updatedBy = adminUid;
 
-    if (category) {
+    if (category && !supplier.userTitle) {
       const isCategoryValid = isValidCategory(category);
 
       if (!isCategoryValid)
@@ -497,13 +506,31 @@ export async function updateSupplierDetail(req, res) {
         supplier.username
       );
       fieldsToUpdate.userTitle = userTitle;
+
+      // Combine country code and phone into full E.164 format
+      const fullPhone = `${supplier.countryCode}${supplier.phone}`;
+
+      // ✅ Save/Update to Google Contacts here
+      // Create or update Google Contact and log the result
+      const logInfo = await createOrUpdateContact(userTitle, fullPhone);
+    }
+
+    // Always stamp who’s making the change, but don’t count it as “something to update”
+    fieldsToUpdate.updatedBy = adminUid;
+
+    // Check if there’s anything but `updatedBy` in fieldsToUpdate
+    const actualChanges = Object.keys(fieldsToUpdate).filter(
+      (k) => k !== 'updatedBy'
+    );
+    if (actualChanges.length === 0) {
+      return frontError(res, 'Nothing to update.');
     }
 
     await supplier.update(fieldsToUpdate);
 
     return successOk(res, "Supplier updated successfully.");
   } catch (error) {
-    console.log("===== error ===== : ", error);
+    console.error("===== error in updateSupplierDetail ===== : ", error);
     return catchError(res, error);
   }
 }
@@ -577,7 +604,7 @@ export async function updateSupplierPhone(req, res) {
 
     return successOk(res, "Phone number updated successfully.");
   } catch (error) {
-    console.log("===== error updating phone ===== :", error);
+    console.error("===== error updating phone ===== :", error);
     return catchError(res, error);
   }
 }
@@ -598,87 +625,7 @@ export async function deleteSupplierPhone(req, res) {
 
     return successOk(res, "Phone number deleted successfully.");
   } catch (error) {
-    console.log("===== error deleting phone ===== :", error);
+    console.error("===== error deleting phone ===== :", error);
     return catchError(res, error);
   }
 }
-
-// // ========================= Approve Project ============================
-
-// export async function approveProject(req, res) {
-//     try {
-//         const userUid = req.user.uuid
-
-//         const reqBodyFields = queryReqFields(req, res, ["uuid"]);
-//         if (reqBodyFields.error) return reqBodyFields.response;
-
-//         const { uuid } = req.query;
-
-//         const project = await Project.findByPk(uuid);
-//         if (!project) return frontError(res, "Invalid uuid.");
-
-//         const projectStatus = project.status
-//         if (projectStatus === 'open') return validationError(res, "project is already approved.")
-
-//         const fieldsToUpdate = {
-//             status: "open",
-//             approvedby: userUid
-//         };
-
-//         await project.update(fieldsToUpdate, {
-//             where: { uuid },
-//         });
-
-//         return successOkWithData(res, "Project approved successfully.");
-//     } catch (error) {
-//         return catchError(res, error);
-//     }
-// }
-
-// // ========================= Reject Project ============================
-
-// export async function rejectProject(req, res) {
-//     try {
-//         const userUid = req.user.uuid
-
-//         const reqBodyFields = queryReqFields(req, res, ["uuid"]);
-//         if (reqBodyFields.error) return reqBodyFields.response;
-
-//         const { uuid } = req.query;
-
-//         const project = await Project.findByPk(uuid);
-//         if (!project) return frontError(res, "Invalid uuid.");
-
-//         const projectStatus = project.status
-//         if (projectStatus === 'rejected') return validationError(res, "project is already rejected.")
-
-//         const fieldsToUpdate = {
-//             status: "rejected",
-//             approvedby: userUid
-//         };
-
-//         await project.update(fieldsToUpdate, {
-//             where: { uuid },
-//         });
-
-//         return successOkWithData(res, "Project rejected successfully.");
-//     } catch (error) {
-//         return catchError(res, error);
-//     }
-// }
-
-// // ========================= Project stats ============================
-
-// export async function projectStats(req, res) {
-//     try {
-//         const totalProjectCount = await Project.count()
-//         const pendingProjectCount = await Project.count({ where: { status: 'pending' } })
-//         const openProjectCount = await Project.count({ where: { status: 'open' } })
-//         const closedProjectCount = await Project.count({ where: { status: 'closed' } })
-//         const rejectedProjectCount = await Project.count({ where: { status: 'rejected' } })
-
-//         return successOkWithData(res, "Stats fetched successfully.", { totalProjectCount, pendingProjectCount, openProjectCount, closedProjectCount, rejectedProjectCount });
-//     } catch (error) {
-//         return catchError(res, error);
-//     }
-// }
