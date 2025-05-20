@@ -19,6 +19,25 @@ const { Password, User } = models;
 // ========================= Helping Functions =====================
 // =================================================================
 
+// const assignPasswords = async () => {
+//   const users = await User.findAll({ order: [["uuid", "ASC"]] });
+//   const passwords = await Password.findAll({
+//     where: { active: true },
+//     order: [["uuid", "ASC"]],
+//   });
+
+//   if (passwords.length === 0) {
+//     console.log("No active passwords available!");
+//     return;
+//   }
+
+//   for (let i = 0; i < users.length; i++) {
+//     const passwordIndex = i % passwords.length; // Round-robin logic
+//     await users[i].update({ passwordUuid: passwords[passwordIndex].uuid });
+//   }
+//   console.log("Passwords reassigned successfully!");
+// };
+
 const assignPasswords = async () => {
   const users = await User.findAll({ order: [["uuid", "ASC"]] });
   const passwords = await Password.findAll({
@@ -32,9 +51,19 @@ const assignPasswords = async () => {
   }
 
   for (let i = 0; i < users.length; i++) {
-    const passwordIndex = i % passwords.length; // Round-robin logic
-    await users[i].update({ passwordUuid: passwords[passwordIndex].uuid });
+    const user = users[i];
+    const passwordIndex = i % passwords.length;
+    const newPasswordUuid = passwords[passwordIndex].uuid;
+
+    // Only update if password is changing
+    if (user.passwordUuid !== newPasswordUuid) {
+      await user.update({
+        lastPasswordUuid: user.passwordUuid,
+        passwordUuid: newPasswordUuid,
+      });
+    }
   }
+
   console.log("Passwords reassigned successfully!");
 };
 

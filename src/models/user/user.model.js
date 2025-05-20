@@ -55,6 +55,11 @@ const User = sequelize.define(
       references: { model: "Password", key: "uuid" },
       allowNull: true, // Initially null if no passwords exist
     },
+    lastPasswordUuid: {
+      type: DataTypes.UUID,
+      references: { model: "Password", key: "uuid" },
+      allowNull: true,
+    },
     userTitle: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -82,5 +87,13 @@ Password.hasMany(User, {
 User.belongsTo(Password, {
   foreignKey: "passwordUuid",
   targetKey: "uuid",
+  as: "currentPassword", // alias for the current password
   onDelete: "SET NULL", // If a password is deleted, user's passwordUuid becomes NULL
+});
+
+User.belongsTo(Password, {
+  foreignKey: "lastPasswordUuid",
+  targetKey: "uuid",
+  as: "oldPassword", // alias for the last/old password
+  onDelete: "SET NULL", // Prevent crashes if the old password is deleted
 });

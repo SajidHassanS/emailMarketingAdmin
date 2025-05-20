@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { google } from 'googleapis';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { google } from "googleapis";
+import { fileURLToPath } from "url";
 import { Op, Sequelize } from "sequelize";
 import models from "../../models/models.js";
 import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
@@ -23,7 +23,7 @@ import {
   validatePhone,
   validateUsername,
 } from "../../utils/utils.js";
-const { Admin, Email, User, Bonus, Password, Phone, SystemSetting } = models
+const { Admin, Email, User, Bonus, Password, Phone, SystemSetting } = models;
 
 // __dirname workaround for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -58,7 +58,7 @@ const generateUserTitle = async (category, username) => {
         [Op.like]: `${category}_____%`, // e.g., A0001_username
       },
     },
-    order: [['userTitle', 'DESC']],
+    order: [["userTitle", "DESC"]],
   });
 
   let newNumber = 1;
@@ -78,29 +78,29 @@ const generateUserTitle = async (category, username) => {
 
 async function createOrUpdateContact(displayName, phoneNumber) {
   // Normalize to just digits for matching
-  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  const cleanPhone = phoneNumber.replace(/\D/g, "");
 
   try {
     const searchRes = await peopleService.people.searchContacts({
       query: cleanPhone,
-      readMask: 'names,phoneNumbers',
+      readMask: "names,phoneNumbers",
       pageSize: 10,
       // restrict to your “Contacts” source so you don’t get directory/profile entries
-      sources: ['READ_SOURCE_TYPE_CONTACT']
+      sources: ["READ_SOURCE_TYPE_CONTACT"],
     });
 
     // Look through the hits for an exact phone match
-    const people = (searchRes.data.results || []).map(r => r.person);
-    const existing = people.find(person =>
-      (person.phoneNumbers || []).some(p =>
-        p.value.replace(/\D/g, '') === cleanPhone
+    const people = (searchRes.data.results || []).map((r) => r.person);
+    const existing = people.find((person) =>
+      (person.phoneNumbers || []).some(
+        (p) => p.value.replace(/\D/g, "") === cleanPhone
       )
     );
 
     if (existing) {
       const updateRes = await peopleService.people.updateContact({
         resourceName: existing.resourceName,
-        updatePersonFields: 'names,phoneNumbers',
+        updatePersonFields: "names,phoneNumbers",
         requestBody: {
           names: [{ displayName, givenName: displayName }],
           phoneNumbers: [{ value: phoneNumber }],
@@ -116,13 +116,11 @@ async function createOrUpdateContact(displayName, phoneNumber) {
       });
       return createRes.data;
     }
-
   } catch (err) {
-    console.error('Error saving contact:', err);
+    console.error("Error saving contact:", err);
     return { error: err.message };
   }
 }
-
 
 // ========================= Get All Suppliers ============================
 
@@ -165,7 +163,23 @@ export async function getSuppliersList(req, res) {
     const supplierList = await User.findAll({
       where,
       order: [["createdAt", "Desc"]],
-      raw: false,
+      // raw: false,
+      include: [
+        {
+          model: Password,
+          as: "currentPassword",
+          attributes: ["uuid", "password", "active"],
+          required: false,
+          foreignKey: "passwordUuid",
+        },
+        {
+          model: Password,
+          as: "oldPassword",
+          attributes: ["uuid", "password", "active"],
+          required: false,
+          foreignKey: "lastPasswordUuid",
+        },
+      ],
     });
 
     // Get unique 'createdBy' UUIDs from the supplier list
@@ -178,10 +192,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-        where: { uuid: createdByUuids },
-        attributes: ["uuid", "username"],
-        raw: true, // Convert to plain objects
-      })
+          where: { uuid: createdByUuids },
+          attributes: ["uuid", "username"],
+          raw: true, // Convert to plain objects
+        })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -355,7 +369,10 @@ export async function addNewSupplier(req, res) {
     }
 
     // ✅ Assign from Password Pool
-    const passwords = await Password.findAll({ where: { active: true }, order: [['uuid', 'ASC']] });
+    const passwords = await Password.findAll({
+      where: { active: true },
+      order: [["uuid", "ASC"]],
+    });
     const userCount = await User.count();
     const passwordIndex = userCount % passwords.length;
 
@@ -373,31 +390,36 @@ export async function addNewSupplier(req, res) {
     // ✅ Create New User in Database
     const newUser = await User.create(userData);
 
-    const signupBonus = await SystemSetting.findOne({ where: { key: "default_signup_bonus" } });
+    const signupBonus = await SystemSetting.findOne({
+      where: { key: "default_signup_bonus" },
+    });
     if (signupBonus) {
       await Bonus.create({
         userUuid: newUser.uuid,
-        type: 'signup',
+        type: "signup",
         amount: parseInt(signupBonus.value),
-        status: 'pending',
+        status: "pending",
       });
     }
 
     // ✅ Add Referral Bonus (to the referring user, if applicable)
-    let referralBonusStatus = ''; // To store message about referral bonus status
+    let referralBonusStatus = ""; // To store message about referral bonus status
     if (referCode && referUser) {
-      const referralBonus = await SystemSetting.findOne({ where: { key: "default_referral_bonus" } });
+      const referralBonus = await SystemSetting.findOne({
+        where: { key: "default_referral_bonus" },
+      });
       if (referralBonus) {
         await Bonus.create({
           userUuid: referUser.uuid,
-          type: 'referral',
+          type: "referral",
           amount: parseInt(referralBonus.value),
-          status: 'pending',
-          refereeUuid: newUser.uuid,  // Storing the refereeUuid (new user who used the referral code)
+          status: "pending",
+          refereeUuid: newUser.uuid, // Storing the refereeUuid (new user who used the referral code)
         });
-        referralBonusStatus = 'Referral bonus awarded successfully.';
+        referralBonusStatus = "Referral bonus awarded successfully.";
       } else {
-        referralBonusStatus = 'No referral bonus awarded. Please contact admin for more details.';
+        referralBonusStatus =
+          "No referral bonus awarded. Please contact admin for more details.";
       }
     }
 
@@ -405,17 +427,19 @@ export async function addNewSupplier(req, res) {
     const notificationMessage = `Welcome ${newUser.username}! Your account has been successfully created. ${referralBonusStatus}`;
     await createNotification({
       userUuid: newUser.uuid,
-      title: 'Welcome to the Platform',
+      title: "Welcome to the Platform",
       message: notificationMessage,
       type: "info",
     });
-
 
     // Send response with appropriate messages
     if (referCode && referUser) {
       return created(res, "User profile created successfully.");
     } else if (referCode && !referUser) {
-      return created(res, "User profile created successfully, but the provided referCode is invalid.");
+      return created(
+        res,
+        "User profile created successfully, but the provided referCode is invalid."
+      );
     } else {
       return created(res, "User profile created successfully.");
     }
@@ -520,10 +544,10 @@ export async function updateSupplierDetail(req, res) {
 
     // Check if there’s anything but `updatedBy` in fieldsToUpdate
     const actualChanges = Object.keys(fieldsToUpdate).filter(
-      (k) => k !== 'updatedBy'
+      (k) => k !== "updatedBy"
     );
     if (actualChanges.length === 0) {
-      return frontError(res, 'Nothing to update.');
+      return frontError(res, "Nothing to update.");
     }
 
     await supplier.update(fieldsToUpdate);

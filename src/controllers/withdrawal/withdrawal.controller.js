@@ -2,7 +2,13 @@ import { Op, Sequelize } from "sequelize";
 import Email from "../../models/email/email.model.js";
 import models from "../../models/models.js";
 import { bodyReqFields, queryReqFields } from "../../utils/requiredFields.js";
-import { catchError, frontError, notFound, successOkWithData, validationError } from "../../utils/responses.js";
+import {
+  catchError,
+  frontError,
+  notFound,
+  successOkWithData,
+  validationError,
+} from "../../utils/responses.js";
 import { createNotification } from "../../utils/notificationUtils.js";
 import Bonus from "../../models/withdrawal/bonus.model.js";
 import BonusWithdrawal from "../../models/withdrawal/bonusWithdrawal.model.js";
@@ -27,14 +33,14 @@ export async function getAllWithdrawals(req, res) {
       if (startDate) {
         // Convert startDate to Date and reset time to midnight (start of day)
         const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);  // Reset time to 00:00:00
+        start.setHours(0, 0, 0, 0); // Reset time to 00:00:00
         whereConditions.createdAt[Op.gte] = start;
       }
 
       if (endDate) {
         // Convert endDate to Date and reset time to 23:59:59
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);  // Set time to 23:59:59
+        end.setHours(23, 59, 59, 999); // Set time to 23:59:59
         whereConditions.createdAt[Op.lte] = end;
       }
     }
@@ -54,7 +60,9 @@ export async function getAllWithdrawals(req, res) {
           model: User,
           as: "user",
           attributes: ["username", "countryCode", "phone", "userTitle"],
-          where: Object.keys(userConditions).length ? userConditions : undefined,
+          where: Object.keys(userConditions).length
+            ? userConditions
+            : undefined,
         },
         {
           model: WithdrawalMethod,
@@ -64,16 +72,18 @@ export async function getAllWithdrawals(req, res) {
       order: [["createdAt", "DESC"]],
     });
 
-    if (!withdrawals.length)
-      return notFound(res, "No withdrawals found.");
+    if (!withdrawals.length) return notFound(res, "No withdrawals found.");
 
-    return successOkWithData(res, "Withdrawals fetched successfully.", withdrawals);
+    return successOkWithData(
+      res,
+      "Withdrawals fetched successfully.",
+      withdrawals
+    );
   } catch (error) {
     console.error("Error fetching all withdrawals:", error);
     return catchError(res, error);
   }
 }
-
 
 export async function handleWithdrawalApproval(req, res) {
   const reqBodyFields = bodyReqFields(req, res, ["withdrawalUuid", "action"]);
@@ -82,14 +92,21 @@ export async function handleWithdrawalApproval(req, res) {
   const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
 
   // Validate action type
-  if (!['approve', 'reject'].includes(action)) {
-    return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
+  if (!["approve", "reject"].includes(action)) {
+    return validationError(
+      res,
+      "Invalid action. It must be 'approve' or 'reject'."
+    );
   }
 
   try {
     // Fetch the withdrawal request (either regular or bonus)
-    const regularWithdrawal = await Withdrawal.findOne({ where: { uuid: withdrawalUuid } });
-    const bonusWithdrawal = await BonusWithdrawal.findOne({ where: { uuid: withdrawalUuid } });
+    const regularWithdrawal = await Withdrawal.findOne({
+      where: { uuid: withdrawalUuid },
+    });
+    const bonusWithdrawal = await BonusWithdrawal.findOne({
+      where: { uuid: withdrawalUuid },
+    });
 
     let withdrawalRequest = regularWithdrawal || bonusWithdrawal;
 
@@ -100,18 +117,26 @@ export async function handleWithdrawalApproval(req, res) {
     // Fetch the associated bonus if it's a bonus withdrawal
     let bonus;
     if (bonusWithdrawal) {
-      bonus = await Bonus.findOne({ where: { uuid: withdrawalRequest.bonusUuid } });
+      bonus = await Bonus.findOne({
+        where: { uuid: withdrawalRequest.bonusUuid },
+      });
       if (!bonus) {
-        return validationError(res, "The associated bonus for this withdrawal request is not found.");
+        return validationError(
+          res,
+          "The associated bonus for this withdrawal request is not found."
+        );
       }
     }
 
     // Check if the withdrawal is in 'pending' status
     if (withdrawalRequest.status !== "pending") {
-      return frontError(res, "Only pending requests can be approved or rejected.");
+      return frontError(
+        res,
+        "Only pending requests can be approved or rejected."
+      );
     }
 
-    if (action === 'approve') {
+    if (action === "approve") {
       // Approve the withdrawal request
       withdrawalRequest.status = "approved";
       await withdrawalRequest.save();
@@ -120,7 +145,9 @@ export async function handleWithdrawalApproval(req, res) {
       await createNotification({
         userUuid: bonus ? bonus.userUuid : withdrawalRequest.userUuid,
         title: bonus ? "Bonus Withdrawal Approved" : "Withdrawal Approved",
-        message: bonus ? `Your ${bonus.type} bonus withdrawal request has been approved.` : `Your withdrawal request has been approved.`,
+        message: bonus
+          ? `Your ${bonus.type} bonus withdrawal request has been approved.`
+          : `Your withdrawal request has been approved.`,
         type: "success",
       });
 
@@ -140,7 +167,8 @@ export async function handleWithdrawalApproval(req, res) {
             await createNotification({
               userUuid: withdrawalRequest.userUuid,
               title: "Signup Bonus Unlocked",
-              message: "Your signup bonus has been unlocked after your first withdrawal.",
+              message:
+                "Your signup bonus has been unlocked after your first withdrawal.",
               type: "success",
             });
           }
@@ -158,15 +186,19 @@ export async function handleWithdrawalApproval(req, res) {
           await createNotification({
             userUuid: bonus.refereeUuid,
             title: "Referral Bonus Unlocked",
-            message: "Your referral bonus has been unlocked after your referee's first withdrawal.",
+            message:
+              "Your referral bonus has been unlocked after your referee's first withdrawal.",
             type: "success",
           });
         }
       }
 
-      return successOkWithData(res, "Withdrawal approved successfully.", withdrawalRequest);
-
-    } else if (action === 'reject') {
+      return successOkWithData(
+        res,
+        "Withdrawal approved successfully.",
+        withdrawalRequest
+      );
+    } else if (action === "reject") {
       // Reject the withdrawal request
       withdrawalRequest.status = "rejected";
       await withdrawalRequest.save();
@@ -190,19 +222,23 @@ export async function handleWithdrawalApproval(req, res) {
       await createNotification({
         userUuid: bonus ? bonus.userUuid : withdrawalRequest.userUuid,
         title: bonus ? "Bonus Withdrawal Rejected" : "Withdrawal Rejected",
-        message: bonus ? `Your ${bonus.type} bonus withdrawal request has been rejected.` : `Your withdrawal request has been rejected.`,
+        message: bonus
+          ? `Your ${bonus.type} bonus withdrawal request has been rejected.`
+          : `Your withdrawal request has been rejected.`,
         type: "error",
       });
 
-      return successOkWithData(res, "Withdrawal rejected successfully.", withdrawalRequest);
+      return successOkWithData(
+        res,
+        "Withdrawal rejected successfully.",
+        withdrawalRequest
+      );
     }
-
   } catch (error) {
     console.error("Error handling withdrawal:", error);
     return catchError(res, error);
   }
 }
-
 
 export async function handleWithdrawal(req, res) {
   try {
@@ -213,12 +249,17 @@ export async function handleWithdrawal(req, res) {
     const { withdrawalUuid, action, remarks } = req.body; // action can be 'approve' or 'reject'
 
     // Validate action type
-    if (!['approve', 'reject'].includes(action)) {
-      return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
+    if (!["approve", "reject"].includes(action)) {
+      return validationError(
+        res,
+        "Invalid action. It must be 'approve' or 'reject'."
+      );
     }
 
     // Fetch the withdrawal request by UUID
-    const withdrawal = await Withdrawal.findOne({ where: { uuid: withdrawalUuid } });
+    const withdrawal = await Withdrawal.findOne({
+      where: { uuid: withdrawalUuid },
+    });
 
     if (!withdrawal) {
       return frontError(res, "Withdrawal request not found.");
@@ -226,17 +267,29 @@ export async function handleWithdrawal(req, res) {
 
     // Check if the withdrawal is in a 'pending' status for approval or rejection
     if (withdrawal.status !== "pending") {
-      return frontError(res, "Only pending requests can be approved or rejected.");
+      return frontError(
+        res,
+        "Only pending requests can be approved or rejected."
+      );
     }
 
-    if (action === 'approve') {
+    if (action === "approve") {
       // Validate required fields for approval
-      if (!remarks) return validationError(res, "'remarks' is required for approval.");
-      if (!req.file) return validationError(res, "Payment screenshot is required for approval.");
+      if (!remarks)
+        return validationError(res, "'remarks' is required for approval.");
+      // if (!req.file)
+      //   return validationError(
+      //     res,
+      //     "Payment screenshot is required for approval."
+      //   );
 
       // Approve the withdrawal request
       withdrawal.status = "approved";
-      withdrawal.paymentScreenshot = req.file.key
+      // withdrawal.paymentScreenshot = req.file.key;
+      // Only set paymentScreenshot if file was uploaded
+      if (req.file) {
+        withdrawal.paymentScreenshot = req.file.key;
+      }
       withdrawal.remarks = remarks;
 
       await withdrawal.save();
@@ -267,25 +320,33 @@ export async function handleWithdrawal(req, res) {
 
       // Handle first approved withdrawal and bonus unlocking logic
       const withdrawalCount = await Withdrawal.count({
-        where: { userUuid: withdrawal.userUuid, withdrawalType: "email", status: "approved" },
+        where: {
+          userUuid: withdrawal.userUuid,
+          withdrawalType: "email",
+          status: "approved",
+        },
       });
 
-      console.log("===== withdrawalCount ===== : ", withdrawalCount)
+      console.log("===== withdrawalCount ===== : ", withdrawalCount);
 
       if (withdrawalCount === 1) {
         // Unlock the user's signup bonus if this is their first approved withdrawal
         const bonus = await Bonus.findOne({
-          where: { userUuid: withdrawal.userUuid, unlockedAfterFirstWithdrawal: false, },
+          where: {
+            userUuid: withdrawal.userUuid,
+            unlockedAfterFirstWithdrawal: false,
+          },
         });
 
-        console.log("===== bonus ===== : ", bonus)
+        console.log("===== bonus ===== : ", bonus);
         if (bonus) {
           await bonus.update({ unlockedAfterFirstWithdrawal: true });
 
           await createNotification({
             userUuid: withdrawal.userUuid,
             title: "Signup Bonus Unlocked",
-            message: "Your signup bonus has been unlocked after your first withdrawal.",
+            message:
+              "Your signup bonus has been unlocked after your first withdrawal.",
             type: "success",
           });
         }
@@ -295,7 +356,7 @@ export async function handleWithdrawal(req, res) {
           const referrerBonus = await Bonus.findOne({
             where: { userUuid: bonus.refereeUuid, type: "referral" },
           });
-          console.log("===== referrerBonus ===== : ", referrerBonus)
+          console.log("===== referrerBonus ===== : ", referrerBonus);
 
           if (referrerBonus) {
             await referrerBonus.update({ unlockedAfterFirstWithdrawal: true });
@@ -303,16 +364,20 @@ export async function handleWithdrawal(req, res) {
             await createNotification({
               userUuid: bonus.refereeUuid,
               title: "Referral Bonus Unlocked",
-              message: "Your referral bonus has been unlocked after your referee's first withdrawal.",
+              message:
+                "Your referral bonus has been unlocked after your referee's first withdrawal.",
               type: "success",
             });
           }
         }
       }
 
-      return successOkWithData(res, "Withdrawal approved successfully.", withdrawal);
-
-    } else if (action === 'reject') {
+      return successOkWithData(
+        res,
+        "Withdrawal approved successfully.",
+        withdrawal
+      );
+    } else if (action === "reject") {
       // Reject the withdrawal request
       withdrawal.status = "rejected";
       await withdrawal.save();
@@ -341,14 +406,17 @@ export async function handleWithdrawal(req, res) {
         },
       });
 
-      return successOkWithData(res, "Withdrawal rejected successfully.", withdrawal);
+      return successOkWithData(
+        res,
+        "Withdrawal rejected successfully.",
+        withdrawal
+      );
     }
   } catch (error) {
     console.error("Error handling withdrawal:", error);
     return catchError(res, error);
   }
 }
-
 
 // export async function approveWithdrawal(req, res) {
 //   try {
@@ -431,7 +499,6 @@ export async function handleWithdrawal(req, res) {
 //         }
 //       }
 //     }
-
 
 //     return successOkWithData(res, "Withdrawal approved successfully.", withdrawal);
 //   } catch (error) {
@@ -526,7 +593,7 @@ export async function getwithdrawalStats(req, res) {
     // Get total amount withdrawn (all-time) for approved and rejected withdrawals
     const totalAmountWithdrawn = await Withdrawal.sum("amount", {
       where: {
-        status: "approved" // Only consider approved withdrawals
+        status: "approved", // Only consider approved withdrawals
       },
     });
 
@@ -633,7 +700,6 @@ export async function getwithdrawalStats(req, res) {
 //     return catchError(res, error);
 //   }
 // }
-
 
 // // Admin API to approve or reject bonus withdrawal requests
 // export async function approveRejectBonusWithdrawal(req, res) {
@@ -801,8 +867,11 @@ export async function approveRejectBonusWithdrawal(req, res) {
   const { withdrawalUuid, action } = req.body; // action can be 'approve' or 'reject'
 
   // Validate action type
-  if (!['approve', 'reject'].includes(action)) {
-    return validationError(res, "Invalid action. It must be 'approve' or 'reject'.");
+  if (!["approve", "reject"].includes(action)) {
+    return validationError(
+      res,
+      "Invalid action. It must be 'approve' or 'reject'."
+    );
   }
 
   try {
@@ -814,31 +883,37 @@ export async function approveRejectBonusWithdrawal(req, res) {
     });
 
     if (!withdrawal) {
-      return validationError(res, "No withdrawal request found with the provided UUID.");
+      return validationError(
+        res,
+        "No withdrawal request found with the provided UUID."
+      );
     }
 
     // Check if the withdrawal is in a 'pending' status for approval or rejection
     if (withdrawal.status !== "pending") {
-      return frontError(res, "Only pending requests can be approved or rejected.");
+      return frontError(
+        res,
+        "Only pending requests can be approved or rejected."
+      );
     }
 
-    console.log("===== withdrawal ===== : ", withdrawal)
+    console.log("===== withdrawal ===== : ", withdrawal);
 
     const bonusType = withdrawal.withdrawalType.split("-")[0];
 
-    if (action === 'approve') {
+    if (action === "approve") {
       // Approve the withdrawal request
       withdrawal.status = "approved";
       await withdrawal.save();
 
       await Bonus.update(
-        { isWithdrawn: true, },
+        { isWithdrawn: true },
         {
           where: {
             userUuid: withdrawal.userUuid,
             isWithdrawn: false,
             unlockedAfterFirstWithdrawal: true,
-            type: bonusType
+            type: bonusType,
           },
         }
       );
@@ -854,21 +929,24 @@ export async function approveRejectBonusWithdrawal(req, res) {
         },
       });
 
-      return successOkWithData(res, "Bonus withdrawal approved successfully.", withdrawal);
-
-    } else if (action === 'reject') {
+      return successOkWithData(
+        res,
+        "Bonus withdrawal approved successfully.",
+        withdrawal
+      );
+    } else if (action === "reject") {
       // Reject the withdrawal request
       withdrawal.status = "rejected";
       await withdrawal.save();
 
       await Bonus.update(
-        { isWithdrawn: false, },
+        { isWithdrawn: false },
         {
           where: {
             userUuid: withdrawal.userUuid,
             isWithdrawn: true,
             unlockedAfterFirstWithdrawal: true,
-            type: bonusType
+            type: bonusType,
           },
         }
       );
@@ -885,11 +963,17 @@ export async function approveRejectBonusWithdrawal(req, res) {
         },
       });
 
-      return successOkWithData(res, "Bonus withdrawal rejected successfully.", withdrawal);
-
+      return successOkWithData(
+        res,
+        "Bonus withdrawal rejected successfully.",
+        withdrawal
+      );
     }
   } catch (error) {
-    console.error("Error processing bonus withdrawal approval/rejection:", error);
+    console.error(
+      "Error processing bonus withdrawal approval/rejection:",
+      error
+    );
     return frontError(res, "Something went wrong. Please try again later.");
   }
 }
