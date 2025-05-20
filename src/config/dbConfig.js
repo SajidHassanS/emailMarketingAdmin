@@ -8,20 +8,20 @@ const dbUser = "postgres";
 const dbPass = "hassan526688";
 const dbHost = "project3.c7q4kemc23tb.eu-north-1.rds.amazonaws.com";
 
-// const sequelize = new Sequelize(dbName, dbUser, dbPass, {
-//   host: dbHost,
-//   port: 5432,
-//   dialect: "postgres",
-//   dialectOptions: {
-//     ssl: {
-//       require: true,
-//       rejectUnauthorized: false,
-//     },
-//   },
-//   logging: console.log, // Optional: shows SQL queries
-// });
+const sequelize = new Sequelize(dbName, dbUser, dbPass, {
+  host: dbHost,
+  port: 5432,
+  dialect: "postgres",
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+    },
+  },
+  logging: console.log, // Optional: shows SQL queries
+});
 
-const sequelize = new Sequelize(dbUrl);
+// const sequelize = new Sequelize(dbUrl);
 
 export const connectDB = async () => {
   try {
