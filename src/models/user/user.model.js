@@ -65,6 +65,10 @@ const User = sequelize.define(
       allowNull: true,
       unique: true,
     },
+    isPremium: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
   },
   {
     schema: "public",

@@ -36,6 +36,7 @@ import messageRoutes from "./routes/message/message.route.js";
 import marqueeRoutes from "./routes/marquee/marquee.route.js";
 import faqRoutes from "./routes/faq/faq.route.js";
 import instructionRoutes from "./routes/instruction/instruction.route.js";
+import domainRoutes from "./routes/domain/domain.route.js";
 
 // =========================================
 //            Configurations
@@ -105,6 +106,7 @@ app.use("/api/chat", messageRoutes);
 app.use("/api/marquee", marqueeRoutes);
 app.use("/api/faq", faqRoutes);
 app.use("/api/instruction", instructionRoutes);
+app.use("/api/domain", domainRoutes);
 
 // =========================================
 //            Global Error Handler
