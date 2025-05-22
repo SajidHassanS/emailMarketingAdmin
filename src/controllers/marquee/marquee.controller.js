@@ -13,7 +13,6 @@ const { MarqueeMessage } = models;
 export const getAllMarqueeMessages = async (req, res) => {
   try {
     const messages = await MarqueeMessage.findAll({
-      where: { isEnabled: true },
       order: [["order", "ASC"]],
     });
 
@@ -92,15 +91,13 @@ export const updateMarqueeMessage = async (req, res) => {
     let responseMessage = "";
 
     if (changes.includes("message") && changes.includes("enabled")) {
-      responseMessage = `Marquee message updated and ${
-        isEnabled ? "enabled" : "disabled"
-      }.`;
+      responseMessage = `Marquee message updated and ${isEnabled ? "enabled" : "disabled"
+        }.`;
     } else if (changes.includes("message")) {
       responseMessage = "Live marquee message updated.";
     } else if (changes.includes("enabled") || changes.includes("disabled")) {
-      responseMessage = `Marquee message ${
-        found.isEnabled ? "enabled" : "disabled"
-      }.`;
+      responseMessage = `Marquee message ${found.isEnabled ? "enabled" : "disabled"
+        }.`;
     }
 
     return successOkWithData(res, responseMessage, found);

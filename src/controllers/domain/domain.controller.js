@@ -69,7 +69,7 @@ export const updateDomain = async (req, res) => {
       changes.push("domain");
     }
 
-    if (typeof isEnabled === "boolean" && isEnabled !== existing.isEnabled) {
+    if (isEnabled !== undefined && isEnabled !== existing.isEnabled) {
       existing.isEnabled = isEnabled;
       changes.push(isEnabled ? "enabled" : "disabled");
     }

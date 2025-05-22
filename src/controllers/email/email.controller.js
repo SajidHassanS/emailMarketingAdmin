@@ -335,15 +335,15 @@ export async function bulkEmailEntry(req, res) {
       attributes: ["uuid", "passwordUuid"],
       include: {
         model: Password,
+        as: "currentPassword",
         attributes: ["uuid", "password"],
       },
     });
 
-    if (!user || !user.Password || !user.Password.password)
-      return validationError(
-        res,
-        "User not found or user has no assigned password. Please add passwords first."
-      );
+    if (!user || !user.currentPassword)
+      return notFound(res, "User not found or user has no assigned password. Please add passwords first.");
+
+    const pw = user.currentPassword.password;
 
     const existingEmails = await Email.findAll({
       where: { email: emailList },
@@ -370,7 +370,7 @@ export async function bulkEmailEntry(req, res) {
     for (const email of newEmails) {
       emailEntries.push({
         email,
-        password: user.Password.password,
+        password: pw,
         userUuid: userUuid,
         status: status,
         amount: status === "good" ? rewardAmount : 0,
