@@ -23,6 +23,11 @@ const Email = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    recoveryEmail: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      validate: { isEmail: true },
+    },
     status: {
       type: DataTypes.ENUM("good", "bad", "pending"),
       defaultValue: "pending",
