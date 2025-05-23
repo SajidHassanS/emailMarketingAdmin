@@ -192,10 +192,10 @@ export async function getSuppliersList(req, res) {
     // Fetch admin details for those UUIDs
     const adminDetails = createdByUuids.length
       ? await Admin.findAll({
-          where: { uuid: createdByUuids },
-          attributes: ["uuid", "username"],
-          raw: true, // Convert to plain objects
-        })
+        where: { uuid: createdByUuids },
+        attributes: ["uuid", "username"],
+        raw: true, // Convert to plain objects
+      })
       : [];
 
     // Convert admin details to a dictionary (uuid -> admin object)
@@ -500,11 +500,14 @@ export async function updateSupplierDetail(req, res) {
     const supplier = await User.findByPk(uuid);
     if (!supplier) return frontError(res, "Invalid uuid.");
 
-    const { active, bonus, category, password } = req.body;
+    const { active, bonus, category, password, isPremium } = req.body;
+
+    console.log("===== req.body ===== : ", req.body)
 
     let fieldsToUpdate = {};
 
     if (active !== undefined) fieldsToUpdate.active = active; // Check explicitly if active is not undefined (false should be valid)
+    if (isPremium !== undefined) fieldsToUpdate.isPremium = isPremium;
     if (bonus) fieldsToUpdate.bonus = bonus;
     if (password) {
       // ✅ Validate Password Format
@@ -536,11 +539,14 @@ export async function updateSupplierDetail(req, res) {
 
       // ✅ Save/Update to Google Contacts here
       // Create or update Google Contact and log the result
-      const logInfo = await createOrUpdateContact(userTitle, fullPhone);
+      await createOrUpdateContact(userTitle, fullPhone);
     }
 
     // Always stamp who’s making the change, but don’t count it as “something to update”
     fieldsToUpdate.updatedBy = adminUid;
+
+    console.log("===== fieldsToUpdate ===== : ", fieldsToUpdate)
+
 
     // Check if there’s anything but `updatedBy` in fieldsToUpdate
     const actualChanges = Object.keys(fieldsToUpdate).filter(

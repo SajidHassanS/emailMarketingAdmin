@@ -383,16 +383,27 @@ export async function handleWithdrawal(req, res) {
       await withdrawal.save();
 
       // Rollback associated emails
-      await Email.update(
-        { isWithdrawn: false },
-        {
-          where: {
-            userUuid: withdrawal.userUuid,
-            isWithdrawn: true,
-            status: "good",
-          },
-        }
-      );
+      // await Email.update(
+      //   { isWithdrawn: false },
+      //   {
+      //     where: {
+      //       userUuid: withdrawal.userUuid,
+      //       isWithdrawn: true,
+      //       status: "good",
+      //     },
+      //   }
+      // );
+
+      // 1) Read back the exactly-withdrawn UUIDs
+      const emailUuids = withdrawal.withdrawnEmailUuids || [];
+
+      // 2) Rollback only those emails
+      if (emailUuids.length) {
+        await Email.update(
+          { isWithdrawn: false },
+          { where: { uuid: emailUuids } }
+        );
+      }
 
       // Create error notification for the user
       await createNotification({

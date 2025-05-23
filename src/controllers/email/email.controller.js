@@ -49,8 +49,6 @@ export async function getAllEmails(req, res) {
   try {
     // const userUid = req.userUid;
 
-    console.log("===== get all emails api hit =====")
-
     const {
       status,
       startDate,
@@ -102,8 +100,6 @@ export async function getAllEmails(req, res) {
     });
 
     if (!emails.length) return notFound(res, "No emails found.");
-
-    console.log("===== emails =====: ", emails)
 
     return successOkWithData(res, "Profile fetched successfully", emails);
   } catch (error) {

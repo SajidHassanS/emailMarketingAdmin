@@ -40,6 +40,10 @@ const Withdrawal = sequelize.define(
     paymentScreenshot: {
       type: DataTypes.STRING,
     },
+    withdrawnEmailUuids: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
   },
   {
     underscored: true,
