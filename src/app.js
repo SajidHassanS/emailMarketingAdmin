@@ -1,4 +1,11 @@
 // =========================================
+//             Cron Job Import
+// =========================================
+
+// run inactivity cron on load
+import './schedulers/inactivityReminder.js';
+
+// =========================================
 //             Lbraries Import
 // =========================================
 import chalk from "chalk";
