@@ -1,5 +1,5 @@
 import express from "express";
-import * as jobCtrl from "../../controllers/supplier/supplier.controller.js";
+import * as supplierCtrl from "../../controllers/supplier/supplier.controller.js";
 import verifyToken from "../../middlewares/authMiddleware.js";
 import { checkRole } from "../../middlewares/adminRole.middleware.js";
 
@@ -10,59 +10,37 @@ router.get(
   "/list",
   verifyToken,
   checkRole(["superadmin", "admin"]),
-  jobCtrl.getSuppliersList
+  supplierCtrl.getSuppliersList
 );
 
 router.get(
   "/simple-list",
   verifyToken,
   checkRole(["superadmin", "admin"]),
-  jobCtrl.getSuppliersSimpleList
+  supplierCtrl.getSuppliersSimpleList
 );
 
 router.get(
   "/simple-list/admin",
   verifyToken,
   checkRole(["superadmin", "admin"]),
-  jobCtrl.getAdminsSimpleList
+  supplierCtrl.getAdminsSimpleList
 );
-
-// router
-//     .route("/")
-//     .get(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.getSupplierDetail)
-//     .post(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.addNewSupplier)
-//     .patch(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.updateSupplierDetail)
-//     .delete(verifyToken, checkRole(["superadmin", "admin"]), jobCtrl.deleteSupplier);
 
 router
   .route("/")
   .all(verifyToken, checkRole(["superadmin", "admin"])) // Apply middleware to all routes
-  .get(jobCtrl.getSupplierDetail)
-  .post(jobCtrl.addNewSupplier)
-  .patch(jobCtrl.updateSupplierDetail)
-  .delete(jobCtrl.deleteSupplier);
+  .get(supplierCtrl.getSupplierDetail)
+  .post(supplierCtrl.addNewSupplier)
+  .patch(supplierCtrl.updateSupplierDetail)
+  .delete(supplierCtrl.deleteSupplier);
 
 router
   .route("/phone")
-  .patch(jobCtrl.updateSupplierPhone)
-  .delete(jobCtrl.deleteSupplierPhone);
+  .patch(supplierCtrl.updateSupplierPhone)
+  .delete(supplierCtrl.deleteSupplierPhone);
 
-// // ✅ Post Project (Employer)
-// router.post("/add", verifyToken, checkRole(["apprenticeship"]), jobCtrl.addProject);
-
-// // ✅ Update Project
-// router.patch("/update", verifyToken, checkRole(["apprenticeship"]), jobCtrl.updateProjectDetails);
-
-// // ✅ Delete Project
-// router.delete("/delete", verifyToken, checkRole(["apprenticeship"]), jobCtrl.deleteProject);
-
-// // ✅ Approve Project
-// router.patch("/approve", verifyToken, checkRole(["apprenticeship"]), jobCtrl.approveProject);
-
-// // ✅ Reject Project
-// router.patch("/reject", verifyToken, checkRole(["apprenticeship"]), jobCtrl.rejectProject);
-
-// // ✅ Project stats
-// router.get("/stats", verifyToken, jobCtrl.projectStats);
+// user details with stats, balance, phones, withdrawal methods and history.
+router.get("/details", verifyToken, supplierCtrl.getUserDetails);
 
 export default router;

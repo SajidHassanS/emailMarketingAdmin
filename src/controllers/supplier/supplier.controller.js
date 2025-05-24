@@ -23,6 +23,8 @@ import {
   validatePhone,
   validateUsername,
 } from "../../utils/utils.js";
+import WithdrawalMethod from "../../models/withdrawal/withdrawalMethod.model.js";
+import Withdrawal from "../../models/withdrawal/withdarwal.model.js";
 const { Admin, Email, User, Bonus, Password, Phone, SystemSetting } = models;
 
 // __dirname workaround for ES modules
@@ -657,5 +659,159 @@ export async function deleteSupplierPhone(req, res) {
   } catch (error) {
     console.error("===== error deleting phone ===== :", error);
     return catchError(res, error);
+  }
+}
+
+// ========================= Supplier Details ============================
+
+export async function getUserDetails(req, res) {
+  try {
+    const reqQueryFields = queryReqFields(req, res, ["uuid"]);
+    if (reqQueryFields.error) return reqQueryFields.response;
+
+    const { uuid } = req.query; // supplier uuid
+
+    // 1) Basic user
+    const user = await User.findByPk(uuid, {
+      attributes: [
+        'uuid', 'username', 'countryCode', 'phone', 'active', 'isPremium', 'userTitle', 'password', 'profile_img'
+      ]
+    });
+    if (!user) {
+      return frontError(res, 'User not found.', 'user');
+    }
+
+    // 2) Month boundaries
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // 3) Email counts
+    const [
+      totalGood, totalBad, totalPending,
+      monthGood, monthBad, monthPending
+    ] = await Promise.all([
+      Email.count({ where: { userUuid: uuid, status: 'good' } }),
+      Email.count({ where: { userUuid: uuid, status: 'bad' } }),
+      Email.count({ where: { userUuid: uuid, status: 'pending' } }),
+
+      Email.count({
+        where: {
+          userUuid: uuid, status: 'good',
+          createdAt: { [Op.between]: [startOfMonth, endOfMonth] }
+        }
+      }),
+      Email.count({
+        where: {
+          userUuid: uuid, status: 'bad',
+          createdAt: { [Op.between]: [startOfMonth, endOfMonth] }
+        }
+      }),
+      Email.count({
+        where: {
+          userUuid: uuid, status: 'pending',
+          createdAt: { [Op.between]: [startOfMonth, endOfMonth] }
+        }
+      })
+    ]);
+
+    // 4) Calculate balances
+    const allEmails = await Email.findAll({
+      where: { userUuid: uuid },
+      attributes: ['amount', 'status', 'isWithdrawn', 'createdAt']
+    });
+    let overallBalance = 0, monthBalance = 0;
+    allEmails.forEach(e => {
+      if (e.status === 'good' && !e.isWithdrawn) {
+        overallBalance += e.amount;
+        if (e.createdAt >= startOfMonth && e.createdAt <= endOfMonth) {
+          monthBalance += e.amount;
+        }
+      } else if (e.isWithdrawn && e.amount < 0) {
+        overallBalance += e.amount;
+        if (e.createdAt >= startOfMonth && e.createdAt <= endOfMonth) {
+          monthBalance += e.amount;
+        }
+      }
+    });
+
+    // 5) Bonus stats
+    const [
+      totalSignup, totalReferral,
+      unlockedSignup, unlockedReferral
+    ] = await Promise.all([
+      Bonus.sum('amount', { where: { userUuid: uuid, type: 'signup', isWithdrawn: false } }),
+      Bonus.sum('amount', { where: { userUuid: uuid, type: 'referral', isWithdrawn: false } }),
+      Bonus.sum('amount', {
+        where: {
+          userUuid: uuid, type: 'signup', isWithdrawn: false, unlockedAfterFirstWithdrawal: true
+        }
+      }),
+      Bonus.sum('amount', {
+        where: {
+          userUuid: uuid, type: 'referral', isWithdrawn: false, unlockedAfterFirstWithdrawal: true
+        }
+      })
+    ]);
+    const ts = totalSignup || 0;
+    const tr = totalReferral || 0;
+    const us = unlockedSignup || 0;
+    const ur = unlockedReferral || 0;
+    const bonusStats = {
+      signup: { total: ts, unlocked: us, locked: ts - us },
+      referral: { total: tr, unlocked: ur, locked: tr - ur }
+    };
+
+    // 6) Other phones
+    const otherPhones = await Phone.findAll({
+      where: { userUuid: uuid },
+      attributes: ['uuid', 'countryCode', 'phone']
+    });
+
+    // 7) Withdrawal methods
+    const withdrawalMethods = await WithdrawalMethod.findAll({
+      where: { userUuid: uuid },
+      attributes: ['uuid', 'methodType', 'accountNumber', 'accountTitle']
+    });
+
+    // 8) Email withdrawal history
+    const emailWithdrawalHistory = await Withdrawal.findAll({
+      where: { userUuid: uuid, withdrawalType: 'email' },
+      order: [['createdAt', 'DESC']],
+      attributes: [
+        'uuid', 'amount', 'status', 'remarks', 'createdAt', 'withdrawnEmailUuids'
+      ]
+    });
+
+    // 9) Bonus withdrawal history
+    const bonusWithdrawalHistory = await Withdrawal.findAll({
+      where: {
+        userUuid: uuid,
+        withdrawalType: { [Op.in]: ['signup-bonus', 'referral-bonus'] }
+      },
+      order: [['createdAt', 'DESC']],
+      attributes: ['uuid', 'withdrawalType', 'amount', 'status', 'remarks', 'createdAt']
+    });
+
+    // 10) Respond
+    return res.json({
+      success: true,
+      data: {
+        user: user.toJSON(),
+        emailStats: {
+          overall: { good: totalGood, bad: totalBad, pending: totalPending, balance: overallBalance },
+          thisMonth: { good: monthGood, bad: monthBad, pending: monthPending, balance: monthBalance }
+        },
+        bonusStats,
+        otherPhones,
+        withdrawalMethods,
+        emailWithdrawalHistory,
+        bonusWithdrawalHistory
+      }
+    });
+
+  } catch (err) {
+    console.error('getUserDetails error:', err);
+    return frontError(res, 'Failed to fetch user details.');
   }
 }
