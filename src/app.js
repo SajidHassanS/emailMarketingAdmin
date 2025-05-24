@@ -3,7 +3,7 @@
 // =========================================
 
 // run inactivity cron on load
-import './schedulers/inactivityReminder.js';
+import './schedulers/inactiveUserRemainder.scheduler.js';
 
 // =========================================
 //             Lbraries Import

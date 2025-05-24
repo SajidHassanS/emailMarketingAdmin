@@ -1,6 +1,6 @@
 // scripts/testInactivityReminder.js
 import './src/config/dbConfig.js';          // ensure DB is initialized
-import { runInactivityReminder } from './src/schedulars/inactiveUserRemainder.schedular.js';
+import { runInactivityReminder } from './src/schedulers/inactiveUserRemainder.scheduler.js';
 
 (async () => {
     try {
